@@ -1,0 +1,370 @@
+#!/bin/bash
+# 
+#!/usr/bin/env -S awk -f ${_} -- <= -S non POSIX
+# coding: utf-8
+#
+# Program for showing the hierarchy of specific processes on a Unix computer.
+# Like pstree but with searching for specific processes with pgrep first and display
+# hierarchy of matching processes (parents and children)
+# should work on any Unix supporting commands :
+# pgrep
+# ps -e -o pid,ppid,comm,args
+# (RedHat/CentOS/Fedora/Ubuntu/Suse/Solaris...)
+# 
+
+# Example:
+# $ ./pgtree sshd
+#   1 (root) [init] /init
+#   └─6 (root) [init] /init
+#     └─144 (root) [systemd] /lib/systemd/systemd --system-unit=basic.target
+# ►     └─483 (root) [sshd] /usr/sbin/sshd -D
+# ►       └─1066 (root) [sshd] sshd: joknarf [priv]
+# ►         └─1181 (joknarf) [sshd] sshd: joknarf@pts/1
+#             └─1182 (joknarf) [bash] -bash
+#               ├─1905 (joknarf) [sleep] sleep 60
+#               └─1906 (joknarf) [top] top
+# 
+
+# __author__ = "Franck Jouvanceau"
+# __copyright__ = "Copyright 2020, Franck Jouvanceau"
+# __license__ = "MIT"
+[ -x /bin/nawk ] && awk=nawk || awk=awk
+$awk '
+function runcmd(cmd)
+# run command
+{
+    RS = "\003"    # Record Separator to EOT
+    $0 = ""        # if cmd has no output
+    cmd | getline
+    close(cmd)
+    RS="\n"
+    sub("\n$", "")  # Remove last \n
+    return $0
+}
+
+function ask(prompt)
+# input text
+{
+    printf("%s", prompt)
+    getline answer < "-"
+    return answer
+}
+
+function mypids(    cmd)
+{
+    cmd = "ps -p $$ -o ppid"
+    cmd |getline
+    cmd |getline
+    close(cmd)
+    my_pids[$1] = 1
+    my_pids[ps_info[$1,"ppid"]] = 1
+    my_pids[children[$1]]=1
+    my_pids[children[children[$1]]]=1
+}
+
+function treedisplay(use_ascii, use_color)
+# Tree display attributes
+{
+    COLOR_FG = "\x1b[38;5;"
+    COLOR_RESET = "\x1b[0m"
+    if (use_ascii) {
+        selected = ">"
+        child = "|_"
+        notchild = "| "
+        lastchild = "\\_"
+    } else {
+        selected = "►"
+        child = "├─"
+        notchild = "│ "
+        lastchild = "└─"
+    }
+    if (use_color) {
+        colors["pid"] = 12
+        colors["user"] = 3
+        colors["comm"] = 2
+        colors["stime"] = 6
+    }
+}
+
+function colorize(field, value)
+# colorize fields
+{
+    if (field in colors)
+        return COLOR_FG colors[field] "m" value COLOR_RESET
+    return value
+}
+
+function proctree(pids, use_uid, use_ascii, use_color)
+# Manage process tree of pids
+{
+    for (i in pids)
+        all_pids[pids[i]]=1
+    treedisplay(use_ascii, use_color)
+    get_psinfo(use_uid)
+    build_tree()
+    mypids()
+}
+function strip(str)
+{
+    sub("^ *", "", str)
+    sub(" *$", "", str)
+    return str
+}
+function get_psinfo(use_uid)
+# parse unix ps command
+{
+    user = "user"
+    if (use_uid)
+        user = "uid"
+    out = runcmd("ps -e -o pid,ppid,stime," user ",comm,args")
+    split(out, ps_out, "\n")
+    # cannot split as space char can occur in comm
+    # guess columns width from ps header :
+    # PID and PPID right aligned (and UID if used)
+    # "  PID  PPID USER     COMMAND  COMMAND"
+    col_b["pid"] = 1
+    col_b["ppid"] = match(ps_out[1],"PID") + 4
+    col_b["stime"] = match(ps_out[1], "PPID") + 5
+    col_b["user"] = match(ps_out[1], "STIME") + 6
+    col_b["comm"] = match(ps_out[1], "COMMAND") 
+    sub("COMMAND", "command", ps_out[1])
+    col_b["args"] = match(ps_out[1], "COMMAND")
+    delete ps_out[1]
+    children[""]=""
+    for (i in ps_out) {
+        line = ps_out[i]
+        pid = strip(substr(line, 1, col_b["ppid"]-1))
+        ppid = strip(substr(line, col_b["ppid"], col_b["stime"]-col_b["ppid"]))
+        if (ppid == pid)
+            ppid = "-1"
+        children[ppid] = append(children[ppid], pid)
+        ps_info[pid,"ppid"] = ppid
+        ps_info[pid,"stime"] = strip(substr(line, col_b["stime"], col_b["user"]-col_b["stime"]))
+        ps_info[pid,"user"] = strip(substr(line, col_b["user"], col_b["comm"]-col_b["user"]))
+        ps_info[pid,"comm"] = strip(substr(line, col_b["comm"], col_b["args"]-col_b["comm"]))
+        ps_info[pid,"args"] = substr(line, col_b["args"])
+    }
+}
+
+function append(str, element)
+{
+   if (str=="")
+       return element
+   if (match(","str",",","element","))
+       return str
+   return str "," element
+}
+
+function joinkeys(array, separator,   i,j,s)
+{
+    for (i in array) {
+        j = j s i
+	s = separator
+    }
+    return j
+}
+
+function get_parents()
+# get parents list of pids
+{
+    for (pid in all_pids) {
+        if (!((pid,"ppid") in ps_info))
+            continue
+        while ((pid,"ppid") in ps_info) {
+            ppid = ps_info[pid,"ppid"]
+            pids_tree[ppid] = append(pids_tree[ppid], pid)
+            last_ppid = pid
+            pid = ppid
+        }
+        top_parents = append(top_parents, last_ppid)
+    }
+}
+
+# recursive
+function children2tree(pids)
+# build children tree
+{
+    while (pids) {
+        match(pids,",|$")
+        pid = substr(pids,1,RSTART-1)
+        pids = substr(pids,RSTART+1)
+        if (pid in pids_tree)
+            continue
+        if (pid in children) {
+            pids_tree[pid] = children[pid]
+            children2tree(children[pid])
+        }
+    }
+}
+
+function build_tree()
+#build process tree
+{
+    for(i in pids) s_pids = append(s_pids, pids[i])
+    children2tree(s_pids)
+    get_parents()
+}
+
+function print_proc(pid, pre, print_it, last, ret)
+# display process information with indent/tree/colors
+{
+    next_p = ""
+    ppre = pre
+    if (pid in my_pids)
+	return 0
+    if (pid in all_pids) {
+        print_it = 1
+        ppre = selected substr(pre, 2) # ⇒ 🠖 🡆 ➤ ➥ ► ▶
+    }
+    if (print_it) {
+        if (!(pid in my_pids)) 
+	    selected_pids[pid] = 1
+        if (pre == " ")  # head of hierarchy
+            curr_p = next_p = " "
+        else if (last) {  # last child
+            curr_p = lastchild
+            next_p = "  "
+        } else { # not last child
+            curr_p = child
+            next_p = notchild
+        }
+        ps_print = colorize("pid", pid) \
+                  colorize("user", " (" ps_info[pid,"user"] ") ") \
+                  colorize("comm", "[" ps_info[pid,"comm"]  "] ") \
+                  colorize("stime", ps_info[pid,"stime"] " ") \
+                  ps_info[pid,"args"]
+        output = ppre curr_p ps_print
+        print(output)
+    }
+    ret["next_p"] = next_p
+    return print_it
+}
+
+# recursive
+function _print_tree(pids, print_it, pre,     pid, next_print_it, nextp)
+# display wonderful process tree
+{
+    while(pids) {
+        match(pids,",|$")
+        pid = substr(pids,1,RSTART-1)
+        pids = substr(pids,RSTART+1)
+        next_print_it = print_proc(pid, pre, print_it, (pids == ""), ret)
+        next_p = ret["next_p"]
+        _print_tree(pids_tree[pid], next_print_it, pre next_p)
+    }
+}
+
+function print_tree(child_only, sig, confirmed )
+# display full or children only process tree
+{
+    if (sig)
+        kill_with_children(sig, confirmed)
+    else
+        _print_tree(top_parents, (! child_only), " ")
+}
+
+function kill_with_children(sig, False)
+# kill processes and children with signal"""
+{
+    _print_tree(top_parents, 0, " ")
+    print("kill " joinkeys(selected_pids, " "))
+    if (! confirmed) {
+        answer = ask("Confirm (y/[n]) ? ")
+        if (answer != "y")
+            return
+    }
+    for (pid in selected_pids) {
+        system("kill -"sig" "pid)
+    }
+}
+
+function getopts(opts, options,    a_opts, op)
+# cli params manager
+{
+    len = split(opts, op, "")
+    for (i = 1; i <= len; i++)
+    {
+        opt = op[i]
+        nxt = op[i+1]
+        if (nxt == ":") {
+            i++
+            a_opts[opt]=":"
+        } else
+            a_opts[opt]=""
+    }
+    for (i = 1; i < ARGC; ++i) {
+        if (ARGV[i] ~ /^-/) {
+            len = split( ARGV[i], op, "")
+            for(j = 2; j <= len; j++) {
+                if (a_opts["-"op[j]] == ":") {
+                    options["-"op[j]] = ARGV[i+1]
+		    delete ARGV[i]
+                    i++
+                } else
+                    options["-"op[j]] = ""
+            }
+        } else
+            options[ARGV[i]] = ""
+	delete ARGV[i]
+    }
+}
+
+function usage_exit()
+{
+    print(usage)
+    exit(1)
+}
+
+function main(argv)
+# pgtree command line
+{
+    usage = "\
+    usage: pgtree [-ICya] [-c|-k|-K] [-p <pid1>,...|<pgrep args>]\n\
+\n\
+    -I : use -o uid instead of -o user for ps command\n\
+         (if uid/user mapping is broken ps command can be stuck)\n\
+    -c : display processes and children only \n\
+    -k : kill -TERM processes and children\n\
+    -K : kill -KILL processes and children\n\
+    -y : do not ask for confirmation to kill\n\
+    -C : no color (default colored output on tty)\n\
+    -a : use ascii characters for tree\n\
+\n\
+    by default display full process hierarchy (parents + children of selected processes)\n\
+\n\
+    -p <pids> : select processes pids to display hierarchy (default 1)\n\
+    <pgrep args> : use pgrep to select processes (see pgrep -h)\n\
+\n\
+    found pids are prefixed with ►\n\
+    "
+    argopt = "ICckKfxvinoyap:u:U:g:G:P:s:t:F:"
+    getopts( argopt, options)
+
+    sig = 0
+    pids[1] = "1"
+    for (opt in options) {
+        if (opt == "-h") usage_exit()
+	else if (opt == "-k") sig = 15
+        else if (opt == "-K") sig = 9
+        else if (opt == "-p") split(options[opt], pids, ",")
+        else if (opt ~ /^-[fxvino]$/)
+            pgrep_args = pgrep_args " " opt
+        else if (opt ~ /^-[uUgGPstF]$/)
+            pgrep_args = pgrep_args " " opt " " options[opt]
+        else if (opt !~ /^-[ICyac-]$/)
+            pgrep_args = pgrep_args " " opt
+    }
+    if (pgrep_args) {
+        out = runcmd("/usr/bin/pgrep" pgrep_args)
+        split(out, pids, "\n")
+    }
+    printf("\x1b[?7l")  # rmam
+    proctree(pids, ("-I" in options), ("-a" in options), (!("-C" in options)) )
+    print_tree(("-c" in options), sig, ("-y" in options) )
+    printf("\x1b[?7h")  # smam
+}
+
+BEGIN {
+    main()
+}
+' -- "$@"
