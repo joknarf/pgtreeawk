@@ -29,7 +29,7 @@
 # __copyright__ = "Copyright 2020, Franck Jouvanceau"
 # __license__ = "MIT"
 [ -x /bin/nawk ] && awk=nawk || awk=awk
-$awk '
+$awk -v mypid=$$ '
 function runcmd(cmd)
 # run command
 {
@@ -48,18 +48,6 @@ function ask(prompt)
     printf("%s", prompt)
     getline answer < "-"
     return answer
-}
-
-function mypids(    cmd)
-{
-    cmd = "ps -p $$ -o ppid"
-    cmd |getline
-    cmd |getline
-    close(cmd)
-    my_pids[$1] = 1
-    my_pids[ps_info[$1,"ppid"]] = 1
-    my_pids[children[$1]]=1
-    my_pids[children[children[$1]]]=1
 }
 
 function treedisplay(use_ascii, use_color)
@@ -102,7 +90,6 @@ function proctree(pids, use_uid, use_ascii, use_color)
     treedisplay(use_ascii, use_color)
     get_psinfo(use_uid)
     build_tree()
-    mypids()
 }
 function strip(str)
 {
@@ -135,6 +122,8 @@ function get_psinfo(use_uid)
         line = ps_out[i]
         pid = strip(substr(line, 1, col_b["ppid"]-1))
         ppid = strip(substr(line, col_b["ppid"], col_b["stime"]-col_b["ppid"]))
+        if (pid == mypid || ppid == mypid)
+            continue
         if (ppid == pid)
             ppid = "-1"
         children[ppid] = append(children[ppid], pid)
@@ -159,7 +148,7 @@ function joinkeys(array, separator,   i,j,s)
 {
     for (i in array) {
         j = j s i
-	s = separator
+        s = separator
     }
     return j
 }
@@ -210,15 +199,12 @@ function print_proc(pid, pre, print_it, last, ret)
 {
     next_p = ""
     ppre = pre
-    if (pid in my_pids)
-	return 0
     if (pid in all_pids) {
         print_it = 1
         ppre = selected substr(pre, 2) # ⇒ 🠖 🡆 ➤ ➥ ► ▶
     }
     if (print_it) {
-        if (!(pid in my_pids)) 
-	    selected_pids[pid] = 1
+        selected_pids[pid] = 1
         if (pre == " ")  # head of hierarchy
             curr_p = next_p = " "
         else if (last) {  # last child
@@ -292,20 +278,21 @@ function getopts(opts, options,    a_opts, op)
         } else
             a_opts[opt]=""
     }
-    for (i = 1; i < ARGC; ++i) {
+    # ARGV[1] = "--"
+    for (i = 2; i < ARGC; i++) {
         if (ARGV[i] ~ /^-/) {
             len = split( ARGV[i], op, "")
             for(j = 2; j <= len; j++) {
-                if (a_opts["-"op[j]] == ":") {
+                if (a_opts[op[j]] == ":") {
                     options["-"op[j]] = ARGV[i+1]
-		    delete ARGV[i]
+                    delete ARGV[i]
                     i++
                 } else
                     options["-"op[j]] = ""
             }
         } else
             options[ARGV[i]] = ""
-	delete ARGV[i]
+        delete ARGV[i]
     }
 }
 
@@ -338,13 +325,13 @@ function main(argv)
     found pids are prefixed with ►\n\
     "
     argopt = "ICckKfxvinoyap:u:U:g:G:P:s:t:F:"
-    getopts( argopt, options)
+    getopts(argopt, options)
 
     sig = 0
     pids[1] = "1"
     for (opt in options) {
         if (opt == "-h") usage_exit()
-	else if (opt == "-k") sig = 15
+        else if (opt == "-k") sig = 15
         else if (opt == "-K") sig = 9
         else if (opt == "-p") split(options[opt], pids, ",")
         else if (opt ~ /^-[fxvino]$/)
@@ -354,7 +341,7 @@ function main(argv)
         else if (opt !~ /^-[ICyac-]$/)
             pgrep_args = pgrep_args " " opt
     }
-    if (pgrep_args) {
+    if (pgrep_args != "") {
         out = runcmd("/usr/bin/pgrep" pgrep_args)
         split(out, pids, "\n")
     }
