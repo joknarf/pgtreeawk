@@ -199,7 +199,7 @@ function get_parents()
 function children2tree(pids)
 # build children tree
 {
-    while (pids) {
+    while (pids!="") {
         match(pids,",|$")
         pid = substr(pids,1,RSTART-1)
         pids = substr(pids,RSTART+1)
@@ -254,7 +254,7 @@ function print_proc(pid, pre, print_it, last, ret)
 function _print_tree(pids, print_it, pre,     pid, next_print_it, nextp)
 # display wonderful process tree
 {
-    while(pids) {
+    while (pids!="") {
         match(pids,",|$")
         pid = substr(pids,1,RSTART-1)
         pids = substr(pids,RSTART+1)
@@ -348,17 +348,18 @@ function main(argv)
 \n\
     found pids are prefixed with ►\n\
     "
-    argopt = "ICckKfxvinoyap:u:U:g:G:P:s:t:F:O:"
+    argopt = "ICckKfxvinoya1p:u:U:g:G:P:s:t:F:O:"
     getopts(argopt, options)
 
     sig = 0
-    pids[1] = 1
+    pids[1] = 0
     for (opt in options) {
         if (opt == "-h") usage_exit()
         else if (opt == "-k") sig = 15
         else if (opt == "-K") sig = 9
         else if (opt == "-p") split(options[opt], pids, ",")
         else if (opt == "-O") xfields = options[opt]
+        else if (opt == "-1") pids[1] = 1
         else if (opt ~ /^-[fxvino]$/)
             pgrep_args = pgrep_args " " opt
         else if (opt ~ /^-[uUgGPstF]$/)
