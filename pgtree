@@ -28,6 +28,7 @@
 # __author__ = "Franck Jouvanceau"
 # __copyright__ = "Copyright 2020, Franck Jouvanceau"
 # __license__ = "MIT"
+
 [ -x /bin/nawk ] && awk=nawk || awk=awk
 $awk -v mypid=$$ '
 function runcmd(cmd)
@@ -69,8 +70,10 @@ function treedisplay(use_ascii, use_color)
     if (use_color) {
         colors["pid"] = 12
         colors["user"] = 3
+        colors["uid"] = 3
         colors["comm"] = 2
         colors["stime"] = 6
+        colors["args"] = 15
     }
 }
 
@@ -79,7 +82,7 @@ function colorize(field, value)
 {
     if (field in colors)
         return COLOR_FG colors[field] "m" value COLOR_RESET
-    return value
+    return COLOR_FG "4m" value
 }
 
 function proctree(pids, use_uid, use_ascii, use_color)
@@ -97,41 +100,59 @@ function strip(str)
     sub(" *$", "", str)
     return str
 }
+function dashes(len)
+{
+    return substr(DASHES, 1, len)
+}
+
+function split_pinfo(line,  c, i)
+{
+    c=1
+    for (i in fields) {
+        pinfo[fields[i]] = strip(substr(line, c, widths[i]))
+        c += widths[i] + 1
+    }
+}
+
 function get_psinfo(use_uid)
 # parse unix ps command
 {
     user = "user"
     if (use_uid)
         user = "uid"
-    out = runcmd("ps -e -o pid,ppid,stime," user ",comm,args")
+    sfields="pid,ppid," user ",comm,"
+    swidths="30,30,30,30,"
+    nxfields = 1
+    if (xfields)
+        nxfields = split(xfields, fields, ",")
+    else
+        xfields = "stime"
+    for (i = 1; i <= nxfields; i++) swidths = swidths "50,"
+    sfields = sfields xfields ",args"
+    swidths = swidths "130"
+    split(swidths, widths, ",")
+    split(sfields, fields, ",")
+    for (i in fields)
+        psopt = psopt " -o " fields[i] "=" dashes(widths[i])
+    print "ps ax " psopt > "/tmp/ps.out"    
+    out = runcmd("ps ax " psopt)
     split(out, ps_out, "\n")
-    # cannot split as space char can occur in comm
-    # guess columns width from ps header :
-    # PID and PPID right aligned (and UID if used)
-    # "  PID  PPID USER     COMMAND  COMMAND"
-    col_b["pid"] = 1
-    col_b["ppid"] = match(ps_out[1],"PID") + 4
-    col_b["stime"] = match(ps_out[1], "PPID") + 5
-    col_b["user"] = match(ps_out[1], "STIME") + 6
-    col_b["comm"] = match(ps_out[1], "COMMAND") 
-    sub("COMMAND", "command", ps_out[1])
-    col_b["args"] = match(ps_out[1], "COMMAND")
     delete ps_out[1]
     children[""]=""
     for (i in ps_out) {
         line = ps_out[i]
-        pid = strip(substr(line, 1, col_b["ppid"]-1))
-        ppid = strip(substr(line, col_b["ppid"], col_b["stime"]-col_b["ppid"]))
+        split_pinfo(line)
+        pid = pinfo["pid"]
+        ppid = pinfo["ppid"]
         if (pid == mypid || ppid == mypid)
             continue
         if (ppid == pid)
             ppid = "-1"
         children[ppid] = append(children[ppid], pid)
-        ps_info[pid,"ppid"] = ppid
-        ps_info[pid,"stime"] = strip(substr(line, col_b["stime"], col_b["user"]-col_b["stime"]))
-        ps_info[pid,"user"] = strip(substr(line, col_b["user"], col_b["comm"]-col_b["user"]))
-        ps_info[pid,"comm"] = strip(substr(line, col_b["comm"], col_b["args"]-col_b["comm"]))
-        ps_info[pid,"args"] = substr(line, col_b["args"])
+        pinfo[fields[3]] = "(" pinfo[fields[3]] ")"
+        pinfo[fields[4]] = "[" pinfo[fields[4]] "]"
+        for (j in fields)
+            ps_info[pid,fields[j]] = pinfo[fields[j]]
     }
 }
 
@@ -214,13 +235,11 @@ function print_proc(pid, pre, print_it, last, ret)
             curr_p = child
             next_p = notchild
         }
-        ps_print = colorize("pid", pid) \
-                  colorize("user", " (" ps_info[pid,"user"] ") ") \
-                  colorize("comm", "[" ps_info[pid,"comm"]  "] ") \
-                  colorize("stime", ps_info[pid,"stime"] " ") \
-                  ps_info[pid,"args"]
-        output = ppre curr_p ps_print
-        print(output)
+        printf("%s%s", ppre, curr_p)
+        for (i in fields)
+            if (fields[i] != "ppid")
+                printf("%s ", colorize(fields[i], ps_info[pid,fields[i]]))
+        printf("\n")
     }
     ret["next_p"] = next_p
     return print_it
@@ -324,7 +343,7 @@ function main(argv)
 \n\
     found pids are prefixed with ►\n\
     "
-    argopt = "ICckKfxvinoyap:u:U:g:G:P:s:t:F:"
+    argopt = "ICckKfxvinoyap:u:U:g:G:P:s:t:F:O:"
     getopts(argopt, options)
 
     sig = 0
@@ -334,6 +353,7 @@ function main(argv)
         else if (opt == "-k") sig = 15
         else if (opt == "-K") sig = 9
         else if (opt == "-p") split(options[opt], pids, ",")
+        else if (opt == "-O") xfields = options[opt]
         else if (opt ~ /^-[fxvino]$/)
             pgrep_args = pgrep_args " " opt
         else if (opt ~ /^-[uUgGPstF]$/)
@@ -352,6 +372,7 @@ function main(argv)
 }
 
 BEGIN {
+    DASHES="-------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
     main()
 }
 ' -- "$@"
