@@ -8,29 +8,28 @@
 # hierarchy of matching processes (parents and children)
 # should work on any Unix supporting commands :
 # pgrep
-# ps -e -o pid,ppid,comm,args
+# ps ax -o pid,ppid,comm,args
 # (RedHat/CentOS/Fedora/Ubuntu/Suse/Solaris...)
-# 
-
-# Example:
-# $ ./pgtree sshd
-#   1 (root) [init] /init
-#   └─6 (root) [init] /init
-#     └─144 (root) [systemd] /lib/systemd/systemd --system-unit=basic.target
-# ►     └─483 (root) [sshd] /usr/sbin/sshd -D
-# ►       └─1066 (root) [sshd] sshd: joknarf [priv]
-# ►         └─1181 (joknarf) [sshd] sshd: joknarf@pts/1
-#             └─1182 (joknarf) [bash] -bash
-#               ├─1905 (joknarf) [sleep] sleep 60
-#               └─1906 (joknarf) [top] top
 # 
 
 # __author__ = "Franck Jouvanceau"
 # __copyright__ = "Copyright 2020, Franck Jouvanceau"
 # __license__ = "MIT"
 
+PGT_PGREP=$(type -p pgrep)
+ps -p $$ -o ucomm >/dev/null 2>&1 && PGT_COMM=ucomm
+[ ! "$PGT_COMM" ] && ps -p $$ -o comm >/dev/null 2>&1 && PGT_COMM=comm
+[ "$PGT_COMM" ] && {
+    ps -p $$ -o stime >/dev/null 2>&1 && PGT_STIME=stime
+    [ ! "$PGT_STIME" ] && ps -p $$ -o start >/dev/null 2>&1 && PGT_STIME=start
+    [ ! "$PGT_STIME" ] && PGT_STIME=time
+}
+# busybox no -p option
+[ ! "$PGT_COMM" ] && ! ps -p $$ >/dev/null 2>&1 && PGT_COMM=comm && PGT_STIME=time
+export PGT_COMM PGT_STIME PGT_PGREP
+
 [ -x /bin/nawk ] && awk=nawk || awk=awk
-$awk -v mypid=$$ '
+$awk -v mypid=$$ -v stime=$PGT_STIME -v comm=$PGT_COMM -v pgrep=$PGT_PGREP '
 function runcmd(cmd)
 # run command
 {
@@ -72,7 +71,9 @@ function treedisplay(use_ascii, use_color)
         colors["user"] = 3
         colors["uid"] = 3
         colors["comm"] = 2
+        colors["ucom"] = 2
         colors["stime"] = 6
+        colors["start"] = 6
         colors["args"] = 15
     }
 }
@@ -108,7 +109,7 @@ function dashes(len)
 function split_pinfo(line,  c, i)
 {
     c=1
-    for (i in fields) {
+    for (i=1; i<=length(fields); i++) {
         pinfo[fields[i]] = strip(substr(line, c, widths[i]))
         c += widths[i] + 1
     }
@@ -120,23 +121,27 @@ function get_psinfo(use_uid)
     user = "user"
     if (use_uid)
         user = "uid"
-    sfields="pid,ppid," user ",comm,"
+    sfields="pid,ppid," user "," comm ","
     swidths="30,30,30,30,"
     nxfields = 1
     if (xfields)
         nxfields = split(xfields, fields, ",")
     else
-        xfields = "stime"
-    for (i = 1; i <= nxfields; i++) swidths = swidths "50,"
+        xfields = stime
+    for (i=1; i<=nxfields; i++) swidths = swidths "50,"
     sfields = sfields xfields ",args"
     swidths = swidths "130"
     split(swidths, widths, ",")
     split(sfields, fields, ",")
-    for (i in fields)
+    for (i=1; i<=length(fields); i++)
         psopt = psopt " -o " fields[i] "=" dashes(widths[i])
-    print "ps ax " psopt > "/tmp/ps.out"    
     out = runcmd("ps ax " psopt)
     split(out, ps_out, "\n")
+    for (i in fields)
+        ps_info[0,fields[i]] = " " fields[i]
+    ps_info[0, "pid"] = 0
+    ps_info[0, "ppid"] = -1
+    children["-1"] = "0"
     delete ps_out[1]
     children[""]=""
     for (i in ps_out) {
@@ -147,7 +152,7 @@ function get_psinfo(use_uid)
         if (pid == mypid || ppid == mypid)
             continue
         if (ppid == pid)
-            ppid = "-1"
+            pinfo["ppid"] = "-1"
         children[ppid] = append(children[ppid], pid)
         pinfo[fields[3]] = "(" pinfo[fields[3]] ")"
         pinfo[fields[4]] = "[" pinfo[fields[4]] "]"
@@ -236,7 +241,7 @@ function print_proc(pid, pre, print_it, last, ret)
             next_p = notchild
         }
         printf("%s%s", ppre, curr_p)
-        for (i in fields)
+        for (i=1; i<=length(fields); i++)
             if (fields[i] != "ppid")
                 printf("%s ", colorize(fields[i], ps_info[pid,fields[i]]))
         printf("\n")
@@ -347,7 +352,7 @@ function main(argv)
     getopts(argopt, options)
 
     sig = 0
-    pids[1] = "1"
+    pids[1] = 1
     for (opt in options) {
         if (opt == "-h") usage_exit()
         else if (opt == "-k") sig = 15
