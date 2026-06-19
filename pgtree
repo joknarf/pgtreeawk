@@ -27,6 +27,7 @@ usage: pgtree [-ICya] [-c|-k|-K] [-p <pid1>,...|<pgrep args>]
     -K : kill -KILL processes and children
     -y : do not ask for confirmation to kill
     -C : no color (default colored output on tty)
+    -W : watch and follow process tree every 2s
     -a : use ascii characters for tree
     -O <fields> : add extra fields to display (comma separated)
 
@@ -335,14 +336,23 @@ BEGIN {
 EOF
 )
 
-argopt="hICckKfxvinoya1:p:u:U:g:G:P:s:t:F:O:"
+pgt() {
+    $awk -v mypid=$$ -v stime=$PGT_STIME -v comm=$PGT_COMM \
+        -v spids="${pids[*]}" -v sig=$sig -v xfields="$xfields" -v soptions="${options[*]}" \
+        "$pgtreeawk" -- "$@"
+}
+
+argopt="WhICckKfxvinoya1:p:u:U:g:G:P:s:t:F:O:"
+args="${*}"
 pids=(0)
 pgrep_args=()
 options=()
+watch=false
 while getopts "$argopt" opt; do
     case $opt in
         h) usage;;
         [ICcya]) options+=("-$opt") ;;
+        W) watch=true ;;
         k) sig=15 ;;
         K) sig=9 ;;
         p) pids=( "$OPTARG" ) ;;
@@ -357,7 +367,11 @@ shift $((OPTIND - 1))
 pgrep_args+=("$@")
 [ "$pgrep_args" ] && pids=( $(pgrep "${pgrep_args[@]}") )
 [ -t 1 ] && printf "\x1b[?7l"  # rmam
-$awk -v mypid=$$ -v stime=$PGT_STIME -v comm=$PGT_COMM \
-     -v spids="${pids[*]}" -v sig=$sig -v xfields="$xfields" -v soptions="${options[*]}" \
-     "$pgtreeawk" -- "$@"
+pgt
+while $watch; do
+    sleep 2
+    clear
+    echo "Watching : pgtree $args : $(date)"
+    pgt
+done
 [ -t 1 ] &&printf "\x1b[?7h"  # smam
