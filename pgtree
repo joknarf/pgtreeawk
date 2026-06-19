@@ -68,12 +68,12 @@ function treedisplay(use_ascii, use_color)
     }
     if (use_color) {
         colors["pid"] = 12
-        colors["user"] = 3
-        colors["uid"] = 3
-        colors["comm"] = 2
-        colors["ucom"] = 2
-        colors["stime"] = 6
-        colors["start"] = 6
+        colors["user"] = 11
+        colors["uid"] = 11
+        colors["comm"] = 10
+        colors["ucomm"] = 10
+        colors["stime"] = 14
+        colors["start"] = 14
         colors["args"] = 15
     }
 }
@@ -83,7 +83,7 @@ function colorize(field, value)
 {
     if (field in colors)
         return COLOR_FG colors[field] "m" value COLOR_RESET
-    return COLOR_FG "4m" value
+    return COLOR_FG "13m" value
 }
 
 function proctree(pids, use_uid, use_ascii, use_color)
@@ -155,6 +155,7 @@ function get_psinfo(use_uid)
             pinfo["ppid"] = "-1"
         children[ppid] = append(children[ppid], pid)
         pinfo[fields[3]] = "(" pinfo[fields[3]] ")"
+        sub(".*/", "", pinfo[fields[4]])
         pinfo[fields[4]] = "[" pinfo[fields[4]] "]"
         for (j in fields)
             ps_info[pid,fields[j]] = pinfo[fields[j]]
