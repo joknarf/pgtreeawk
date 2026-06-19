@@ -133,7 +133,7 @@ function dashes(len)
 function split_pinfo(line,  c, i)
 {
     c=1
-    for (i=1; i<=length(fields); i++) {
+    for (i=1; i<=nfields; i++) {
         if (widths[i]) pinfo[fields[i]] = strip(substr(line, c, widths[i]))
         else pinfo[fields[i]] = strip(substr(line, c))
         c += widths[i] + 1
@@ -159,8 +159,8 @@ function get_psinfo(use_uid)
     for (i=1; i<=nxfields; i++) swidths = swidths "50,"
     sfields = sfields xfields ",args"
     split(swidths, widths, ",")
-    split(sfields, fields, ",")
-    for (i=1; i<=length(fields); i++)
+    nfields = split(sfields, fields, ",")
+    for (i=1; i<=nfields; i++)
         psopt = psopt " -o " fields[i] dashes(widths[i])
     out = runcmd("ps ax " psopt)
     split(out, ps_out, "\n")
@@ -259,7 +259,7 @@ function print_proc(pid, pre, print_it, last, ret)
         ppre = selected substr(pre, 2) # ⇒ 🠖 🡆 ➤ ➥ ► ▶
     }
     if (print_it) {
-        selected_pids[length(selected_pids)] = pid
+        selected_pids[++nselpids] = pid
         if (pre == " ")  # head of hierarchy
             curr_p = next_p = " "
         else if (last) {  # last child
@@ -270,7 +270,7 @@ function print_proc(pid, pre, print_it, last, ret)
             next_p = notchild
         }
         printf("%s%s", ppre, curr_p)
-        for (i=1; i<=length(fields); i++)
+        for (i=1; i<=nfields; i++)
             if (fields[i] != "ppid")
                 printf("%s ", colorize(fields[i], ps_info[pid,fields[i]]))
         printf("\n")
@@ -306,16 +306,16 @@ function kill_with_children(sig, False,  i)
 # kill processes and children with signal
 {
     _print_tree(top_parents, 0, " ")
-    if (!length(selected_pids)) return
+    if (!nselpids) return
     printf("kill")
-    for (i=length(selected_pids)-1;i>=0;i--)
+    for (i=nselpids;i>0;i--)
         printf(" %s", selected_pids[i])
     if (! confirmed) {
         answer = ask(" Confirm (y/[n]) ? ")
         if (answer != "y")
             return
     }
-    for (i=length(selected_pids)-1;i>=0;i--)
+    for (i=nselpids;i>0;i--)
         system("kill -"sig" "selected_pids[i])
 }
 
