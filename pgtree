@@ -346,7 +346,7 @@ pgt() {
         "$pgtreeawk" -- "$@"
 }
 
-argopt="WThICckKfxvinoya1:p:u:U:g:G:P:s:t:F:O:"
+argopt="WThICckKfxvinoya1p:u:U:g:G:P:s:t:F:O:"
 args="${*}"
 pids=(0)
 pgrep_args=()
@@ -380,7 +380,6 @@ if [ "$threads" ] ;then
 else 
     [ "$pgrep_args" ] && pids=( $(pgrep "${pgrep_args[@]}") )
 fi
-#[ "$threads" ] && [ "$popt" ] && pids=( $(ps -T -p "${pids[@]}" -o spid=) )
 [ -t 1 ] && printf "\x1b[?7l"  # rmam
 pgt
 while $watch; do
