@@ -75,8 +75,6 @@ function ask(prompt)
 function treedisplay(use_ascii, use_color)
 # Tree display attributes
 {
-    COLOR_FG = "\x1b[38;5;"
-    COLOR_RESET = "\x1b[0m"
     if (use_ascii) {
         selected = ">"
         child = "|_"
@@ -89,24 +87,26 @@ function treedisplay(use_ascii, use_color)
         lastchild = "└─"
     }
     if (use_color) {
-        colors["pid"] = 12
-        colors["user"] = 11
-        colors["uid"] = 11
-        colors["comm"] = 10
-        colors["ucomm"] = 10
-        colors["stime"] = 14
-        colors["start"] = 14
-        colors["args"] = 15
+        COLOR_FG = "\x1b[38;5;"
+        COLOR_RESET = "\x1b[0m"
+        colors["pid"] = "12m"
+        colors["user"] = "11m"
+        colors["uid"] = "11m"
+        colors["comm"] = "10m"
+        colors["ucomm"] = "10m"
+        colors["stime"] = "14m"
+        colors["start"] = "14m"
+        colors["args"] = "15m"
+        colors["default"] = "13m"
     }
 }
 
 function colorize(field, value)
 # colorize fields
 {
-    if (!use_color) return value
     if (field in colors)
-        return COLOR_FG colors[field] "m" value COLOR_RESET
-    return COLOR_FG "13m" value
+        return COLOR_FG colors[field] value COLOR_RESET
+    return COLOR_FG colors["default"] value
 }
 
 function proctree(pids, use_uid, use_ascii, use_color)
