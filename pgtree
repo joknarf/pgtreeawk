@@ -259,7 +259,7 @@ function print_proc(pid, pre, print_it, last, ret)
         ppre = selected substr(pre, 2) # ⇒ 🠖 🡆 ➤ ➥ ► ▶
     }
     if (print_it) {
-        selected_pids[pid] = 1
+        selected_pids[length(selected_pids)] = pid
         if (pre == " ")  # head of hierarchy
             curr_p = next_p = " "
         else if (last) {  # last child
@@ -302,20 +302,21 @@ function print_tree(child_only, sig, confirmed )
         _print_tree(top_parents, (! child_only), " ")
 }
 
-function kill_with_children(sig, False)
+function kill_with_children(sig, False,  i)
 # kill processes and children with signal
 {
     _print_tree(top_parents, 0, " ")
     if (!length(selected_pids)) return
-    print("kill " joinkeys(selected_pids, " "))
+    printf("kill")
+    for (i=length(selected_pids)-1;i>=0;i--)
+        printf(" %s", selected_pids[i])
     if (! confirmed) {
-        answer = ask("Confirm (y/[n]) ? ")
+        answer = ask(" Confirm (y/[n]) ? ")
         if (answer != "y")
             return
     }
-    for (pid in selected_pids) {
-        system("kill -"sig" "pid)
-    }
+    for (i=length(selected_pids)-1;i>=0;i--)
+        system("kill -"sig" "selected_pids[i])
 }
 
 function split_hash_keys(str, hash,  t)
@@ -327,6 +328,7 @@ function split_hash_keys(str, hash,  t)
 function main(argv)
 # pgtree command line
 {
+    selected_pids[0]="";delete selected_pids[0]
     split_hash_keys(soptions, options)
     split(spids, pids)
     proctree(pids, ("-I" in options), ("-a" in options), (!("-C" in options)) )
