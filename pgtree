@@ -146,13 +146,16 @@ function get_psinfo(use_uid)
     user = "user"
     if (use_uid)
         user = "uid"
-    sfields="pid,ppid," user "," comm ","
+    pid = "pid"
+    if (threads) {
+        psopt = "-T"
+        pid = "spid"
+    }
+    sfields=pid ",ppid," user "," comm ","
     swidths="30,30,30,30,"
     nxfields = 1
-    if (xfields)
-        nxfields = split(xfields, fields, ",")
-    else
-        xfields = stime
+    if (xfields) nxfields = split(xfields, fields, ",")
+    else         xfields = stime
     for (i=1; i<=nxfields; i++) swidths = swidths "50,"
     sfields = sfields xfields ",args"
     split(swidths, widths, ",")
@@ -161,6 +164,7 @@ function get_psinfo(use_uid)
         psopt = psopt " -o " fields[i] dashes(widths[i])
     out = runcmd("ps ax " psopt)
     split(out, ps_out, "\n")
+    fields[1] = "pid"
     for (i in fields)
         ps_info[0,fields[i]] = " " fields[i]
     ps_info[0, "pid"] = 0
@@ -337,25 +341,27 @@ EOF
 )
 
 pgt() {
-    $awk -v mypid=$$ -v stime=$PGT_STIME -v comm=$PGT_COMM \
+    $awk -v mypid=$$ -v stime=$PGT_STIME -v comm=$PGT_COMM -v threads="$threads" \
         -v spids="${pids[*]}" -v sig=$sig -v xfields="$xfields" -v soptions="${options[*]}" \
         "$pgtreeawk" -- "$@"
 }
 
-argopt="WhICckKfxvinoya1:p:u:U:g:G:P:s:t:F:O:"
+argopt="WThICckKfxvinoya1:p:u:U:g:G:P:s:t:F:O:"
 args="${*}"
 pids=(0)
 pgrep_args=()
 options=()
 watch=false
+threads=
 while getopts "$argopt" opt; do
     case $opt in
         h) usage;;
         [ICcya]) options+=("-$opt") ;;
         W) watch=true ;;
+        T) threads=1 ;;
         k) sig=15 ;;
         K) sig=9 ;;
-        p) pids=( "$OPTARG" ) ;;
+        p) pids=( "$OPTARG" );popt=1 ;;
         O) xfields="$OPTARG" ;;
         1) pids=(1) ;;
         [fxvino]) pgrep_args+=("-$opt") ;;
@@ -365,7 +371,16 @@ while getopts "$argopt" opt; do
 done
 shift $((OPTIND - 1))
 pgrep_args+=("$@")
-[ "$pgrep_args" ] && pids=( $(pgrep "${pgrep_args[@]}") )
+if [ "$threads" ] ;then
+    if [ "$popt" ];then 
+        pids=( $(ps -T -p "${pids[@]}" -o spid=) )
+    else
+        [ "$pgrep_args" ] && pids=( $(pgrep -w "${pgrep_args[@]}") )
+    fi
+else 
+    [ "$pgrep_args" ] && pids=( $(pgrep "${pgrep_args[@]}") )
+fi
+#[ "$threads" ] && [ "$popt" ] && pids=( $(ps -T -p "${pids[@]}" -o spid=) )
 [ -t 1 ] && printf "\x1b[?7l"  # rmam
 pgt
 while $watch; do
