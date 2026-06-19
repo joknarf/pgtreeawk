@@ -311,10 +311,16 @@ function kill_with_children(sig, False)
     }
 }
 
+function split_hash_keys(str, hash,  t)
+{
+    split(str, t)
+    for (i in t) hash[t[i]] = 1
+}
+
 function main(argv)
 # pgtree command line
 {
-    split(soption, options)
+    split_hash_keys(soptions, options)
     split(spids, pids)
     printf("\x1b[?7l")  # rmam
     proctree(pids, ("-I" in options), ("-a" in options), (!("-C" in options)) )
@@ -336,7 +342,7 @@ options=()
 while getopts "$argopt" opt; do
     case $opt in
         h) usage;;
-        [ICya]) options+=("-$opt") ;;
+        [ICcya]) options+=("-$opt") ;;
         k) sig=15 ;;
         K) sig=9 ;;
         p) pids=( "$OPTARG" ) ;;
