@@ -103,6 +103,7 @@ function treedisplay(use_ascii, use_color)
 function colorize(field, value)
 # colorize fields
 {
+    if (!use_color) return value
     if (field in colors)
         return COLOR_FG colors[field] "m" value COLOR_RESET
     return COLOR_FG "13m" value
