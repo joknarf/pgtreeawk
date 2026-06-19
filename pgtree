@@ -306,6 +306,7 @@ function kill_with_children(sig, False)
 # kill processes and children with signal
 {
     _print_tree(top_parents, 0, " ")
+    if (!length(selected_pids)) return
     print("kill " joinkeys(selected_pids, " "))
     if (! confirmed) {
         answer = ask("Confirm (y/[n]) ? ")
