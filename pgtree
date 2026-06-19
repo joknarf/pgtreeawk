@@ -297,7 +297,7 @@ function print_tree(child_only, sig, confirmed )
 }
 
 function kill_with_children(sig, False)
-# kill processes and children with signal"""
+# kill processes and children with signal
 {
     _print_tree(top_parents, 0, " ")
     print("kill " joinkeys(selected_pids, " "))
@@ -350,8 +350,6 @@ done
 shift $((OPTIND - 1))
 pgrep_args+=("$@")
 [ "$pgrep_args" ] && pids=( $(pgrep "${pgrep_args[@]}") )
-echo "${pgrep_args[@]}"
-echo "${pids[*]}"
 
 $awk -v mypid=$$ -v stime=$PGT_STIME -v comm=$PGT_COMM \
      -v spids="${pids[*]}" -v sig=$sig -v xfields="$xfields" -v soptions="${options[*]}" \
