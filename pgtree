@@ -29,7 +29,7 @@ ps -p $$ -o ucomm >/dev/null 2>&1 && PGT_COMM=ucomm
 export PGT_COMM PGT_STIME PGT_PGREP
 
 [ -x /bin/nawk ] && awk=nawk || awk=awk
-$awk -v mypid=$$ -v stime=$PGT_STIME -v comm=$PGT_COMM -v pgrep=$PGT_PGREP '
+pgtreeawk=$(cat <<'EOF'
 function runcmd(cmd)
 # run command
 {
@@ -48,6 +48,11 @@ function ask(prompt)
     printf("%s", prompt)
     getline answer < "-"
     return answer
+}
+
+function sh_escape(s) {
+    gsub(/'/, "'\\''", s)
+    return "'" s "'"
 }
 
 function treedisplay(use_ascii, use_color)
@@ -366,7 +371,7 @@ function main(argv)
         else if (opt ~ /^-[uUgGPstF]$/)
             pgrep_args = pgrep_args " " opt " " options[opt]
         else if (opt !~ /^-[ICyac-]$/)
-            pgrep_args = pgrep_args " " opt
+            pgrep_args = pgrep_args " " sh_escape(opt)
     }
     if (pgrep_args != "") {
         out = runcmd("/usr/bin/pgrep" pgrep_args)
@@ -382,4 +387,6 @@ BEGIN {
     DASHES="-------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
     main()
 }
-' -- "$@"
+EOF
+)
+$awk -v mypid=$$ -v stime=$PGT_STIME -v comm=$PGT_COMM -v pgrep=$PGT_PGREP "$pgtreeawk" -- "$@"
