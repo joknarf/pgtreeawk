@@ -16,6 +16,28 @@
 # __copyright__ = "Copyright 2020, Franck Jouvanceau"
 # __license__ = "MIT"
 
+usage() {
+    cat - <<'EOF'
+usage: pgtree [-ICya] [-c|-k|-K] [-p <pid1>,...|<pgrep args>]
+
+    -I : use -o uid instead of -o user for ps command
+         (if uid/user mapping is broken ps command can be stuck)
+    -c : display processes and children only 
+    -k : kill -TERM processes and children
+    -K : kill -KILL processes and children
+    -y : do not ask for confirmation to kill
+    -C : no color (default colored output on tty)
+    -a : use ascii characters for tree
+    -O <fields> : add extra fields to display (comma separated)
+
+    by default display full process hierarchy (parents + children of selected processes)
+
+    -p <pids> : select processes pids to display hierarchy (default 1)
+    <pgrep args> : use pgrep to select processes (see pgrep -h)
+EOF
+    exit 1
+}
+
 PGT_PGREP=$(type -p pgrep)
 ps -p $$ -o ucomm >/dev/null 2>&1 && PGT_COMM=ucomm
 [ ! "$PGT_COMM" ] && ps -p $$ -o comm >/dev/null 2>&1 && PGT_COMM=comm
@@ -48,11 +70,6 @@ function ask(prompt)
     printf("%s", prompt)
     getline answer < "-"
     return answer
-}
-
-function sh_escape(s) {
-    gsub(/'/, "'\\''", s)
-    return "'" s "'"
 }
 
 function treedisplay(use_ascii, use_color)
@@ -294,89 +311,11 @@ function kill_with_children(sig, False)
     }
 }
 
-function getopts(opts, options,    a_opts, op)
-# cli params manager
-{
-    len = split(opts, op, "")
-    for (i = 1; i <= len; i++)
-    {
-        opt = op[i]
-        nxt = op[i+1]
-        if (nxt == ":") {
-            i++
-            a_opts[opt]=":"
-        } else
-            a_opts[opt]=""
-    }
-    # ARGV[1] = "--"
-    for (i = 2; i < ARGC; i++) {
-        if (ARGV[i] ~ /^-/) {
-            len = split( ARGV[i], op, "")
-            for(j = 2; j <= len; j++) {
-                if (a_opts[op[j]] == ":") {
-                    options["-"op[j]] = ARGV[i+1]
-                    delete ARGV[i]
-                    i++
-                } else
-                    options["-"op[j]] = ""
-            }
-        } else
-            options[ARGV[i]] = ""
-        delete ARGV[i]
-    }
-}
-
-function usage_exit()
-{
-    print(usage)
-    exit(1)
-}
-
 function main(argv)
 # pgtree command line
 {
-    usage = "\
-    usage: pgtree [-ICya] [-c|-k|-K] [-p <pid1>,...|<pgrep args>]\n\
-\n\
-    -I : use -o uid instead of -o user for ps command\n\
-         (if uid/user mapping is broken ps command can be stuck)\n\
-    -c : display processes and children only \n\
-    -k : kill -TERM processes and children\n\
-    -K : kill -KILL processes and children\n\
-    -y : do not ask for confirmation to kill\n\
-    -C : no color (default colored output on tty)\n\
-    -a : use ascii characters for tree\n\
-\n\
-    by default display full process hierarchy (parents + children of selected processes)\n\
-\n\
-    -p <pids> : select processes pids to display hierarchy (default 1)\n\
-    <pgrep args> : use pgrep to select processes (see pgrep -h)\n\
-\n\
-    found pids are prefixed with ►\n\
-    "
-    argopt = "ICckKfxvinoya1p:u:U:g:G:P:s:t:F:O:"
-    getopts(argopt, options)
-
-    sig = 0
-    pids[1] = 0
-    for (opt in options) {
-        if (opt == "-h") usage_exit()
-        else if (opt == "-k") sig = 15
-        else if (opt == "-K") sig = 9
-        else if (opt == "-p") split(options[opt], pids, ",")
-        else if (opt == "-O") xfields = options[opt]
-        else if (opt == "-1") pids[1] = 1
-        else if (opt ~ /^-[fxvino]$/)
-            pgrep_args = pgrep_args " " opt
-        else if (opt ~ /^-[uUgGPstF]$/)
-            pgrep_args = pgrep_args " " opt " " options[opt]
-        else if (opt !~ /^-[ICyac-]$/)
-            pgrep_args = pgrep_args " " sh_escape(opt)
-    }
-    if (pgrep_args != "") {
-        out = runcmd("/usr/bin/pgrep" pgrep_args)
-        split(out, pids, "\n")
-    }
+    split(soption, options)
+    split(spids, pids)
     printf("\x1b[?7l")  # rmam
     proctree(pids, ("-I" in options), ("-a" in options), (!("-C" in options)) )
     print_tree(("-c" in options), sig, ("-y" in options) )
@@ -389,4 +328,31 @@ BEGIN {
 }
 EOF
 )
-$awk -v mypid=$$ -v stime=$PGT_STIME -v comm=$PGT_COMM -v pgrep=$PGT_PGREP "$pgtreeawk" -- "$@"
+
+argopt="hICckKfxvinoya1:p:u:U:g:G:P:s:t:F:O:"
+pids=(0)
+pgrep_args=()
+options=()
+while getopts "$argopt" opt; do
+    case $opt in
+        h) usage;;
+        [ICya]) options+=("-$opt") ;;
+        k) sig=15 ;;
+        K) sig=9 ;;
+        p) pids=( "$OPTARG" ) ;;
+        O) xfields="$OPTARG" ;;
+        1) pids=(1) ;;
+        [fxvino]) pgrep_args+=("-$opt") ;;
+        [uUgGPstF]) pgrep_args+=("-$opt" "$OPTARG") ;;
+        *) pgrep_args+=("$opt") ;;
+    esac
+done
+shift $((OPTIND - 1))
+pgrep_args+=("$@")
+[ "$pgrep_args" ] && pids=( $(pgrep "${pgrep_args[@]}") )
+echo "${pgrep_args[@]}"
+echo "${pids[*]}"
+
+$awk -v mypid=$$ -v stime=$PGT_STIME -v comm=$PGT_COMM \
+     -v spids="${pids[*]}" -v sig=$sig -v xfields="$xfields" -v soptions="${options[*]}" \
+     "$pgtreeawk" -- "$@"
