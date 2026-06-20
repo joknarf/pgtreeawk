@@ -49,7 +49,14 @@ ps -p $$ -o ucomm >/dev/null 2>&1 && PGT_COMM=ucomm
 }
 # busybox no -p option
 [ ! "$PGT_COMM" ] && ! ps -p $$ >/dev/null 2>&1 && PGT_COMM=comm && PGT_STIME=time
-export PGT_COMM PGT_STIME PGT_PGREP
+
+SYSTEM=$(uname -s 2>/dev/null || echo "Linux")
+PS_OPTION="ax"
+case "$SYSTEM" in
+    AIX)    PS_OPTION="-e"; PGT_STIME="start" ;;
+    Darwin) PGT_STIME="start" ;;
+    SunOS)  PS_OPTION="-e"; PGT_COMM="fname" ;;
+esac
 
 [ -x /bin/nawk ] && awk=nawk || awk=awk
 pgtreeawk=$(cat <<'EOF'
@@ -148,7 +155,7 @@ function get_psinfo(use_uid)
         user = "uid"
     pid = "pid"
     if (threads) {
-        psopt = "-T"
+        psopt = psopt  " -T"
         pid = "spid"
     }
     sfields=pid ",ppid," user "," comm ","
@@ -162,7 +169,7 @@ function get_psinfo(use_uid)
     nfields = split(sfields, fields, ",")
     for (i=1; i<=nfields; i++)
         psopt = psopt " -o " fields[i] dashes(widths[i])
-    out = runcmd("ps ax " psopt)
+    out = runcmd("ps " psopt)
     split(out, ps_out, "\n")
     fields[1] = "pid"
     for (i in fields)
@@ -344,8 +351,8 @@ EOF
 )
 
 pgt() {
-    $awk -v mypid=$$ -v stime=$PGT_STIME -v comm=$PGT_COMM -v threads="$threads" \
-        -v spids="${pids[*]}" -v sig=$sig -v xfields="$xfields" -v soptions="${options[*]}" \
+    $awk -v mypid=$$ -v psopt="$PS_OPTION" -v stime="$PGT_STIME" -v comm="$PGT_COMM" -v threads="$threads" \
+        -v spids="${pids[*]}" -v sig="$sig" -v xfields="$xfields" -v soptions="${options[*]}" \
         "$pgtreeawk" -- "$@"
 }
 
