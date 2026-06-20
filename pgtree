@@ -371,7 +371,7 @@ _pgrep() {
     done
     shift $((OPTIND - 1))
     re="$1"
-    [ "$re"] || re='.*'
+    [ "$re" ] || re='.*'
     $exact && re="^$1$" || re="$1"
     printf -v w "%*s" 20 ''
     w=${w// /-}
