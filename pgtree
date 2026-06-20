@@ -1,5 +1,5 @@
 #!/bin/bash
-# 
+#
 #!/usr/bin/env -S awk -f ${_} -- <= -S non POSIX
 # coding: utf-8
 #
@@ -8,9 +8,9 @@
 # hierarchy of matching processes (parents and children)
 # should work on any Unix supporting commands :
 # pgrep
-# ps ax -o pid,ppid,comm,args
+# ps (ax|-e) -o pid=,ppid=,user=,comm=|ucomm=,stime=|start=,args=
 # (RedHat/CentOS/Fedora/Ubuntu/Suse/Solaris...)
-# 
+#
 
 # __author__ = "Franck Jouvanceau"
 # __copyright__ = "Copyright 2020, Franck Jouvanceau"
@@ -18,28 +18,36 @@
 
 usage() {
     cat - <<'EOF'
-usage: pgtree [-ICya] [-c|-k|-K] [-p <pid1>,...|<pgrep args>]
+    usage: pgtree [-W] [-RIya] [-C <when>] [-O <psfield>] [-c|-k|-K] [-1|-p <pid1>,...|<pgrep args>]
 
     -I : use -o uid instead of -o user for ps command
          (if uid/user mapping is broken ps command can be stuck)
-    -c : display processes and children only 
+    -c : display processes and children only
     -k : kill -TERM processes and children
     -K : kill -KILL processes and children
     -y : do not ask for confirmation to kill
-    -C : no color (default colored output on tty)
+    -R : force use of internal pgrep
+    -C : color preference : y/yes/always or n/no/never (default auto)
+    -w : tty wrap text : y/yes or n/no (default y)
     -W : watch and follow process tree every 2s
-    -a : use ascii characters for tree
-    -O <fields> : add extra fields to display (comma separated)
+    -a : use ascii characters
+    -T : display threads (ps must support -T option)
+    -O <psfield>[,psfield,...] : display multiple <psfield> instead of 'stime' in output
+                   <psfield> must be valid with ps -o <psfield> command
 
     by default display full process hierarchy (parents + children of selected processes)
 
-    -p <pids> : select processes pids to display hierarchy (default 1)
+    -p <pids> : select processes pids to display hierarchy (default 0)
+    -1 : display hierachy children of pid 1 (not including pid 0)
     <pgrep args> : use pgrep to select processes (see pgrep -h)
+
+    found pids are prefixed with ►
 EOF
     exit 1
 }
 
 PGT_PGREP=$(type -p pgrep)
+[ "$PGT_PGREP" ] || PGT_PGREP='_pgrep'
 ps -p $$ -o ucomm >/dev/null 2>&1 && PGT_COMM=ucomm
 [ ! "$PGT_COMM" ] && ps -p $$ -o comm >/dev/null 2>&1 && PGT_COMM=comm
 [ "$PGT_COMM" ] && {
@@ -337,7 +345,7 @@ function main(argv)
 }
 
 BEGIN {
-    DASHES="-------------------------------------------------------------------------------------------------------------------------------------------------------------------------"
+    DASHES="----------------------------------------------------"
     main()
 }
 EOF
@@ -349,49 +357,91 @@ pgt() {
         "$pgtreeawk" -- "$@"
 }
 
-argopt="WThICckKfxvinoya1p:u:U:g:G:P:s:t:F:O:"
+
+_pgrep() {
+    local opts=fxiwu: psfield="$PGT_COMM" icase exact=false
+
+    while getopts "$opts" opt; do
+        case $opt in
+            f) psfield='args' ;;
+            u) PS_OPTION=" -u $OPTARG" ;;
+            i) icase=1 ;;
+            x) exact=true ;;
+        esac
+    done
+    shift $((OPTIND - 1))
+    re="$1"
+    [ "$re"] || re='.*'
+    $exact && re="^$1$" || re="$1"
+    printf -v w "%*s" 20 ''
+    w=${w// /-}
+    PS_OPTION+=" -o $PGT_PID="$w" -o $psfield"
+    ps $PS_OPTION | $awk '
+    NR==1 { next }
+    { pid=substr($0,1,20); gsub(" ","",pid) }
+    { info=substr($0,22); sub(" *$","",info) }
+    info ~ re { print pid }
+    ' re="$re" IGNORECASE="$icase"
+}
+
+argopt="WRThIckKfxvinoya1C:p:u:U:g:G:P:s:t:F:O:w:"
 args="${*}"
 pids=(0)
 PGT_PID='pid'
 PGT_USER='user'
 pgrep_args=()
 options=()
-watch=false
+watch='false'
 threads=
+color='auto'
+wrap='auto'
 while getopts "$argopt" opt; do
     case $opt in
         h) usage;;
         I) PGT_USER='uid' ;;
-        [Ccya]) options+=("-$opt") ;;
+        C) color="$OPTARG" ;;
+        [cya]) options+=("-$opt") ;;
         W) watch=true ;;
+        w) wrap="$OPTARG" ;;
         T) threads=1; PGT_PID='spid'; PS_OPTION+=' -T' ;;
         k) sig=15 ;;
         K) sig=9 ;;
         p) pids=( "$OPTARG" );popt=1 ;;
         O) xfields="$OPTARG" ;;
         1) pids=(1) ;;
+        R) PGT_PGREP='_pgrep' ;;
         [fxvino]) pgrep_args+=("-$opt") ;;
         [uUgGPstF]) pgrep_args+=("-$opt" "$OPTARG") ;;
         *) pgrep_args+=("$opt") ;;
     esac
 done
-shift $((OPTIND - 1))
+case "$color" in
+    y|yes|always) ;;
+    n|no|never) options+=("-C") ;;
+    *) [ -t 1 ] || options+=("-C") ;;
+esac
+case "$wrap" in
+    y|yes) dowrap=true ;;
+    n|no) dowrap=false ;;
+    *) [ -t 1 ] && dowrap=true || dowrap=false ;;
+esac
+shift $((OPTIND - 1)); unset OPTIND
 pgrep_args+=("$@")
 if [ "$threads" ] ;then
-    if [ "$popt" ];then 
+    if [ "$popt" ];then
         pids=( $(ps -T -p "${pids[@]}" -o spid=) )
     else
-        [ "$pgrep_args" ] && pids=( $(pgrep -w "${pgrep_args[@]}") )
+        [ "$pgrep_args" ] && pids=( $($PGT_PGREP -w "${pgrep_args[@]}") )
     fi
-else 
-    [ "$pgrep_args" ] && pids=( $(pgrep "${pgrep_args[@]}") )
+else
+    [ "$pgrep_args" ] && pids=( $($PGT_PGREP "${pgrep_args[@]}") )
 fi
-[ -t 1 ] && printf "\x1b[?7l"  # rmam
+$dowrap && printf "\x1b[?7l"  # rmam
 pgt
 while $watch; do
     sleep 2
     clear
-    echo "Watching : pgtree $args : $(date)"
+    echo "$(date): Watching : pgtree $args"
     pgt
 done
-[ -t 1 ] &&printf "\x1b[?7h"  # smam
+$dowrap && printf "\x1b[?7h"  # smam
