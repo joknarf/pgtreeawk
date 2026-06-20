@@ -118,13 +118,13 @@ function colorize(field, value)
     return COLOR_FG colors["default"] value
 }
 
-function proctree(pids, use_uid, use_ascii, use_color)
+function proctree(pids, use_ascii, use_color)
 # Manage process tree of pids
 {
     for (i in pids)
         all_pids[pids[i]]=1
     treedisplay(use_ascii, use_color)
-    get_psinfo(use_uid)
+    get_psinfo()
     build_tree()
 }
 function strip(str)
@@ -148,22 +148,14 @@ function split_pinfo(line,  c, i)
     }
 }
 
-function get_psinfo(use_uid)
+function get_psinfo()
 # parse unix ps command
 {
-    user = "user"
-    if (use_uid)
-        user = "uid"
-    pid = "pid"
-    if (threads) {
-        psopt = psopt  " -T"
-        pid = "spid"
-    }
-    sfields=pid ",ppid," user "," comm ","
+    sfields=fpid ",ppid," fuser "," fcomm ","
     swidths="30,30,30,30,"
     nxfields = 1
     if (xfields) nxfields = split(xfields, fields, ",")
-    else         xfields = stime
+    else         xfields = fstime
     for (i=1; i<=nxfields; i++) swidths = swidths "50,"
     sfields = sfields xfields ",args"
     split(swidths, widths, ",")
@@ -339,7 +331,7 @@ function main(argv)
     selected_pids[0]="";delete selected_pids[0]
     split_hash_keys(soptions, options)
     split(spids, pids)
-    proctree(pids, ("-I" in options), ("-a" in options), (!("-C" in options)) )
+    proctree(pids, ("-a" in options), (!("-C" in options)) )
     print_tree(("-c" in options), sig, ("-y" in options) )
     printf("\x1b[?7h")  # smam
 }
@@ -352,14 +344,16 @@ EOF
 )
 
 pgt() {
-    $awk -v mypid=$$ -v psopt="$PS_OPTION" -v stime="$PGT_STIME" -v comm="$PGT_COMM" -v threads="$threads" \
-        -v spids="${pids[*]}" -v sig="$sig" -v xfields="$xfields" -v soptions="${options[*]}" \
+    $awk -v mypid=$$ -v psopt="$PS_OPTION" -v fpid="$PGT_PID" -v fstime="$PGT_STIME" -v fcomm="$PGT_COMM" \
+        -v fuser="$PGT_USER" -v spids="${pids[*]}" -v sig="$sig" -v xfields="$xfields" -v soptions="${options[*]}" \
         "$pgtreeawk" -- "$@"
 }
 
 argopt="WThICckKfxvinoya1p:u:U:g:G:P:s:t:F:O:"
 args="${*}"
 pids=(0)
+PGT_PID='pid'
+PGT_USER='user'
 pgrep_args=()
 options=()
 watch=false
@@ -367,9 +361,10 @@ threads=
 while getopts "$argopt" opt; do
     case $opt in
         h) usage;;
-        [ICcya]) options+=("-$opt") ;;
+        I) PGT_USER='uid' ;;
+        [Ccya]) options+=("-$opt") ;;
         W) watch=true ;;
-        T) threads=1 ;;
+        T) threads=1; PGT_PID='lwp'; PS_OPTION+=' -L' ;;
         k) sig=15 ;;
         K) sig=9 ;;
         p) pids=( "$OPTARG" );popt=1 ;;
@@ -384,7 +379,7 @@ shift $((OPTIND - 1))
 pgrep_args+=("$@")
 if [ "$threads" ] ;then
     if [ "$popt" ];then 
-        pids=( $(ps -T -p "${pids[@]}" -o spid=) )
+        pids=( $(ps -L -p "${pids[@]}" -o lwp=) )
     else
         [ "$pgrep_args" ] && pids=( $(pgrep -w "${pgrep_args[@]}") )
     fi
