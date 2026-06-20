@@ -364,7 +364,7 @@ while getopts "$argopt" opt; do
         I) PGT_USER='uid' ;;
         [Ccya]) options+=("-$opt") ;;
         W) watch=true ;;
-        T) threads=1; PGT_PID='lwp'; PS_OPTION+=' -L' ;;
+        T) threads=1; PGT_PID='spid'; PS_OPTION+=' -T' ;;
         k) sig=15 ;;
         K) sig=9 ;;
         p) pids=( "$OPTARG" );popt=1 ;;
@@ -379,7 +379,7 @@ shift $((OPTIND - 1))
 pgrep_args+=("$@")
 if [ "$threads" ] ;then
     if [ "$popt" ];then 
-        pids=( $(ps -L -p "${pids[@]}" -o lwp=) )
+        pids=( $(ps -T -p "${pids[@]}" -o spid=) )
     else
         [ "$pgrep_args" ] && pids=( $(pgrep -w "${pgrep_args[@]}") )
     fi
