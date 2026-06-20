@@ -102,6 +102,7 @@ function treedisplay(use_ascii, use_color)
         colors["uid"] = "11m"
         colors["comm"] = "10m"
         colors["ucomm"] = "10m"
+        colors["fname"] = "10m"
         colors["stime"] = "14m"
         colors["start"] = "14m"
         colors["args"] = "15m"
