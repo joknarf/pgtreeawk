@@ -184,11 +184,11 @@ function get_psinfo(use_uid)
         line = ps_out[i]
         split_pinfo(line)
         pid = pinfo["pid"]
+        if (pinfo["ppid"] == pid)
+            pinfo["ppid"] = "-1"
         ppid = pinfo["ppid"]
         if (pid == mypid || ppid == mypid)
             continue
-        if (ppid == pid)
-            pinfo["ppid"] = "-1"
         children[ppid] = append(children[ppid], pid)
         pinfo[fields[3]] = "(" pinfo[fields[3]] ")"
         sub(".*/", "", pinfo[fields[4]])
