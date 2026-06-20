@@ -341,7 +341,6 @@ function main(argv)
     split(spids, pids)
     proctree(pids, ("-a" in options), (!("-C" in options)) )
     print_tree(("-c" in options), sig, ("-y" in options) )
-    printf("\x1b[?7h")  # smam
 }
 
 BEGIN {
