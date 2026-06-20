@@ -68,9 +68,8 @@ esac
 
 [ -x /bin/nawk ] && awk=nawk || awk=awk
 pgtreeawk=$(cat <<'EOF'
-function runcmd(cmd)
-# run command
-{
+function runcmd(cmd) {
+    # run command
     RS = "\003"    # Record Separator to EOT
     $0 = ""        # if cmd has no output
     cmd | getline
@@ -80,17 +79,15 @@ function runcmd(cmd)
     return $0
 }
 
-function ask(prompt)
-# input text
-{
+function ask(prompt) {
+    # input text
     printf("%s", prompt)
     getline answer < "-"
     return answer
 }
 
-function treedisplay(use_ascii, use_color)
-# Tree display attributes
-{
+function treedisplay(use_ascii, use_color) {
+    # Tree display attributes
     if (use_ascii) {
         selected = ">"
         child = "|_"
@@ -118,36 +115,32 @@ function treedisplay(use_ascii, use_color)
     }
 }
 
-function colorize(field, value)
-# colorize fields
-{
+function colorize(field, value) {
+    # colorize fields
     if (field in colors)
         return COLOR_FG colors[field] value COLOR_RESET
     return COLOR_FG colors["default"] value
 }
 
-function proctree(pids, use_ascii, use_color)
-# Manage process tree of pids
-{
+function proctree(pids, use_ascii, use_color) {
+    # Manage process tree of pids
     for (i in pids)
         all_pids[pids[i]]=1
     treedisplay(use_ascii, use_color)
     get_psinfo()
     build_tree()
 }
-function strip(str)
-{
+function strip(str) {
     sub("^ *", "", str)
     sub(" *$", "", str)
     return str
 }
-function dashes(len)
-{
+
+function dashes(len) {
     if (len) return "=" substr(DASHES, 1, len)
 }
 
-function split_pinfo(line,  c, i)
-{
+function split_pinfo(line,  c, i) {
     c=1
     for (i=1; i<=nfields; i++) {
         if (widths[i]) pinfo[fields[i]] = strip(substr(line, c, widths[i]))
@@ -156,9 +149,8 @@ function split_pinfo(line,  c, i)
     }
 }
 
-function get_psinfo()
-# parse unix ps command
-{
+function get_psinfo() {
+    # parse unix ps command
     sfields=fpid ",ppid," fuser "," fcomm ","
     swidths="30,30,30,30,"
     nxfields = 1
@@ -198,8 +190,7 @@ function get_psinfo()
     }
 }
 
-function append(str, element)
-{
+function append(str, element) {
    if (str=="")
        return element
    if (match(","str",",","element","))
@@ -207,8 +198,7 @@ function append(str, element)
    return str "," element
 }
 
-function joinkeys(array, separator,   i,j,s)
-{
+function joinkeys(array, separator,   i,j,s) {
     for (i in array) {
         j = j s i
         s = separator
@@ -216,9 +206,8 @@ function joinkeys(array, separator,   i,j,s)
     return j
 }
 
-function get_parents()
-# get parents list of pids
-{
+function get_parents() {
+    # get parents list of pids
     for (pid in all_pids) {
         if (!((pid,"ppid") in ps_info))
             continue
@@ -233,9 +222,8 @@ function get_parents()
 }
 
 # recursive
-function children2tree(pids)
-# build children tree
-{
+function children2tree(pids) {
+    # build children tree
     while (pids!="") {
         match(pids,",|$")
         pid = substr(pids,1,RSTART-1)
@@ -249,17 +237,15 @@ function children2tree(pids)
     }
 }
 
-function build_tree()
-#build process tree
-{
+function build_tree() {
+    #build process tree
     for(i in pids) s_pids = append(s_pids, pids[i])
     children2tree(s_pids)
     get_parents()
 }
 
-function print_proc(pid, pre, print_it, last, ret)
-# display process information with indent/tree/colors
-{
+function print_proc(pid, pre, print_it, last, ret) {
+    # display process information with indent/tree/colors
     next_p = ""
     ppre = pre
     if (pid in all_pids) {
@@ -288,9 +274,8 @@ function print_proc(pid, pre, print_it, last, ret)
 }
 
 # recursive
-function _print_tree(pids, print_it, pre,     pid, next_print_it, nextp)
-# display wonderful process tree
-{
+function _print_tree(pids, print_it, pre,     pid, next_print_it, nextp) {
+    # display wonderful process tree
     while (pids!="") {
         match(pids,",|$")
         pid = substr(pids,1,RSTART-1)
@@ -301,18 +286,16 @@ function _print_tree(pids, print_it, pre,     pid, next_print_it, nextp)
     }
 }
 
-function print_tree(child_only, sig, confirmed )
-# display full or children only process tree
-{
+function print_tree(child_only, sig, confirmed ) {
+    # display full or children only process tree
     if (sig)
         kill_with_children(sig, confirmed)
     else
         _print_tree(top_parents, (! child_only), " ")
 }
 
-function kill_with_children(sig, False,  i)
-# kill processes and children with signal
-{
+function kill_with_children(sig, False,  i) {
+    # kill processes and children with signal
     _print_tree(top_parents, 0, " ")
     if (!nselpids) return
     printf("kill")
@@ -327,15 +310,13 @@ function kill_with_children(sig, False,  i)
         system("kill -"sig" "selected_pids[i])
 }
 
-function split_hash_keys(str, hash,  t)
-{
+function split_hash_keys(str, hash,  t) {
     split(str, t)
     for (i in t) hash[t[i]] = 1
 }
 
-function main(argv)
-# pgtree command line
-{
+function main(argv) {
+    # pgtree command line
     selected_pids[0]="";delete selected_pids[0]
     split_hash_keys(soptions, options)
     split(spids, pids)
