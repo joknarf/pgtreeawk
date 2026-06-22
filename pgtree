@@ -244,7 +244,7 @@ function build_tree() {
     get_parents()
 }
 
-function print_proc(pid, pre, print_it, last) {
+function print_proc(pid, pre, print_it, last, next_p) {
     # display process information with indent/tree/colors
     next_p = ""
     ppre = pre
