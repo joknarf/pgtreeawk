@@ -371,6 +371,7 @@ options=()
 watch='false'
 color='auto'
 wrap='auto'
+set -- $PGTREE "$@"
 while getopts "$argopt" opt; do
     case $opt in
         h) usage;;
