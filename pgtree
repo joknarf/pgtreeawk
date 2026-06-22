@@ -111,6 +111,7 @@ function treedisplay(use_ascii, use_color) {
         colors["stime"] = "14m"
         colors["start"] = "14m"
         colors["args"] = "15m"
+        colors["%cpu"] = "9m"
         colors["default"] = "13m"
     }
 }
