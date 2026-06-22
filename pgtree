@@ -411,7 +411,7 @@ if [ "$PGT_PID" = 'spid' ] ;then
 else
     [ "$pgrep_args" ] && pids=( $($PGT_PGREP "${pgrep_args[@]}") )
 fi
-$dowrap && printf "\x1b[?7l"  # rmam
+$dowrap && printf "\x1b[?7l" && trap 'printf "\x1b[?7h"' EXIT # rmam/smam
 while $watch; do
     clear
     echo "Every 2.0s: pgtree $args    $(date)"
@@ -419,4 +419,3 @@ while $watch; do
     sleep 2
 done
 pgt
-$dowrap && printf "\x1b[?7h"  # smam
