@@ -292,20 +292,18 @@ function print_tree(child_only, sig, confirmed ) {
         _print_tree(top_parents, (! child_only), " ")
 }
 
-function kill_with_children(sig, False,  i) {
+function kill_with_children(sig, confirmed,  i, kill_pids) {
     # kill processes and children with signal
     _print_tree(top_parents, 0, " ")
     if (!nselpids) return
-    printf("kill")
-    for (i=nselpids;i>0;i--)
-        printf(" %s", selected_pids[i])
+    for (i=nselpids;i>0;i--) kill_pids=kill_pids" "selected_pids[i]
+    printf("kill -%s%s\n", sig, kill_pids)
     if (! confirmed) {
-        answer = ask(" Confirm (y/[n]) ? ")
+        answer = ask("Confirm (y/[n]) ? ")
         if (answer != "y")
             return
     }
-    for (i=nselpids;i>0;i--)
-        system("kill -"sig" "selected_pids[i])
+    system("kill -"sig kill_pids)
 }
 
 function split_hash_keys(str, hash,  t) {
