@@ -19,8 +19,7 @@ Same features as [joknarf/pgtree](https://github.com/joknarf/pgtree) but most po
 * watch process tree 
 * supports all unix/linux/macos
 
-The purpose is to have the tool working out of the box on any Unix box, using the default OS python installed, without installing anything else.
-The code must be compatible with python 2.x + 3.x
+The purpose is to have the tool working out of the box on any Unix box.
 
 Should work on any Unix that can execute :
 ```
