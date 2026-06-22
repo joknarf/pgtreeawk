@@ -269,19 +269,17 @@ function print_proc(pid, pre, print_it, last, ret) {
                 printf("%s ", colorize(fields[i], ps_info[pid,fields[i]]))
         printf("\n")
     }
-    ret["next_p"] = next_p
     return print_it
 }
 
 # recursive
-function _print_tree(pids, print_it, pre,     pid, next_print_it, nextp) {
+function _print_tree(pids, print_it, pre,     pid, next_print_it) {
     # display wonderful process tree
     while (pids!="") {
         match(pids,",|$")
         pid = substr(pids,1,RSTART-1)
         pids = substr(pids,RSTART+1)
-        next_print_it = print_proc(pid, pre, print_it, (pids == ""), ret)
-        next_p = ret["next_p"]
+        next_print_it = print_proc(pid, pre, print_it, (pids == ""))
         _print_tree(pids_tree[pid], next_print_it, pre next_p)
     }
 }
