@@ -59,11 +59,11 @@ ps -p $$ -o ucomm >/dev/null 2>&1 && PGT_COMM=ucomm
 [ ! "$PGT_COMM" ] && ! ps -p $$ >/dev/null 2>&1 && PGT_COMM=comm && PGT_STIME=time
 
 SYSTEM=$(uname -s 2>/dev/null || echo "Linux")
-PS_OPTION="ax"
+PS_OPTION=(ax)
 case "$SYSTEM" in
-    AIX)    PS_OPTION="-e"; PGT_STIME="start" ;;
+    AIX)    PS_OPTION=(-e); PGT_STIME="start" ;;
     Darwin) PGT_STIME="start" ;;
-    SunOS)  PS_OPTION="-e"; PGT_COMM="fname" ;;
+    SunOS)  PS_OPTION=(-e); PGT_COMM="fname" ;;
 esac
 
 [ -x /bin/nawk ] && awk=nawk || awk=awk
@@ -328,7 +328,7 @@ EOF
 )
 
 pgt() {
-    $awk -v mypid=$$ -v psopt="$PS_OPTION" -v fpid="$PGT_PID" -v fstime="$PGT_STIME" -v fcomm="$PGT_COMM" \
+    $awk -v mypid=$$ -v psopt="${PS_OPTION[*]}" -v fpid="$PGT_PID" -v fstime="$PGT_STIME" -v fcomm="$PGT_COMM" \
         -v fuser="$PGT_USER" -v spids="${pids[*]}" -v sig="$sig" -v xfields="$xfields" -v soptions="${options[*]}" \
         "$pgtreeawk" -- "$@"
 }
@@ -340,7 +340,7 @@ _pgrep() {
     while getopts "$opts" opt; do
         case $opt in
             f) psfield='args' ;;
-            u) PS_OPTION=" -u $OPTARG" ;;
+            u) PS_OPTION=(-u "$OPTARG") ;;
             i) icase=1 ;;
             x) exact=true ;;
         esac
@@ -351,16 +351,16 @@ _pgrep() {
     $exact && re="^$1$" || re="$1"
     printf -v w "%*s" 20 ''
     w=${w// /-}
-    PS_OPTION+=" -o $PGT_PID="$w" -o $psfield"
-    ps $PS_OPTION | $awk '
-    NR==1 { next }
-    { pid=substr($0,1,20); gsub(" ","",pid) }
-    { info=substr($0,22); sub(" *$","",info) }
-    info ~ re { print pid }
+    PS_OPTION+=(-o "$PGT_PID=$w" -o "$psfield")
+    ps "${PS_OPTION[@]}" | $awk '
+      NR==1 { next }
+      { pid=substr($0,1,20); gsub(" ","",pid) }
+      { info=substr($0,22); sub(" *$","",info) }
+      info ~ re { print pid }
     ' re="$re" IGNORECASE="$icase"
 }
 
-argopt="WRThIckKfxvinoya1C:p:u:U:g:G:P:s:t:F:O:w:"
+argopt="WRThIckKfxvirnoyaA1C:p:u:U:g:G:P:s:t:F:O:w:"
 args="${*}"
 pids=(0)
 PGT_PID='pid'
@@ -368,7 +368,6 @@ PGT_USER='user'
 pgrep_args=()
 options=()
 watch='false'
-threads=
 color='auto'
 wrap='auto'
 while getopts "$argopt" opt; do
@@ -379,15 +378,15 @@ while getopts "$argopt" opt; do
         [cya]) options+=("-$opt") ;;
         W) watch=true ;;
         w) wrap="$OPTARG" ;;
-        T) threads=1; PGT_PID='spid'; PS_OPTION+=' -T' ;;
+        T) PGT_PID='spid'; PS_OPTION+=(-T) ;;
         k) sig=15 ;;
         K) sig=9 ;;
-        p) pids=( "$OPTARG" );popt=1 ;;
+        p) pids=("$OPTARG");popt=1 ;;
         O) xfields="$OPTARG" ;;
         1) pids=(1) ;;
         R) PGT_PGREP='_pgrep' ;;
-        [fxvino]) pgrep_args+=("-$opt") ;;
-        [uUgGPstF]) pgrep_args+=("-$opt" "$OPTARG") ;;
+        [Afxvino]) pgrep_args+=("-$opt") ;;
+        [uUgGPrstF]) pgrep_args+=("-$opt" "$OPTARG") ;;
         *) pgrep_args+=("$opt") ;;
     esac
 done
@@ -403,7 +402,7 @@ case "$wrap" in
 esac
 shift $((OPTIND - 1)); unset OPTIND
 pgrep_args+=("$@")
-if [ "$threads" ] ;then
+if [ "$PGT_PID" = 'spid' ] ;then
     if [ "$popt" ];then
         pids=( $(ps -T -p "${pids[@]}" -o spid=) )
     else
