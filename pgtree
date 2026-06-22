@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 #!/usr/bin/env -S awk -f ${_} -- <= -S non POSIX
 # coding: utf-8
