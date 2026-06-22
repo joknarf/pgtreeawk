@@ -412,11 +412,11 @@ else
     [ "$pgrep_args" ] && pids=( $($PGT_PGREP "${pgrep_args[@]}") )
 fi
 $dowrap && printf "\x1b[?7l"  # rmam
-pgt
 while $watch; do
-    sleep 2
     clear
-    echo "$(date): Watching : pgtree $args"
+    echo "Every 2.0s: pgtree $args    $(date)"
     pgt
+    sleep 2
 done
+pgt
 $dowrap && printf "\x1b[?7h"  # smam
