@@ -163,7 +163,7 @@ function get_psinfo() {
     nfields = split(sfields, fields, ",")
     for (i=1; i<=nfields; i++)
         psopt = psopt " -o " fields[i] dashes(widths[i])
-    out = runcmd("ps " psopt)
+    out = runcmd("COLUMNS=130000 ps " psopt)
     split(out, ps_out, "\n")
     fields[1] = "pid"
     for (i in fields)
