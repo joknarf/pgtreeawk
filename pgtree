@@ -376,7 +376,7 @@ while getopts "$argopt" opt; do
         [cya]) options+=("-$opt") ;;
         W) watch=true ;;
         w) wrap="$OPTARG" ;;
-        T) [ "$PGT_STIME" != "etime" ] && PGT_PID='spid'; PS_OPTION+=(-T) ;;
+        T) [ "$PGT_STIME" = "etime" ] && PGT_PGREP='_pgrep' || PGT_PID='spid'; PS_OPTION+=(-T) ;;
         k) sig=15 ;;
         K) sig=9 ;;
         p) pids=("$OPTARG");popt=1 ;;
