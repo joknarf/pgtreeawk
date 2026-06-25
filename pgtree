@@ -56,7 +56,7 @@ ps -p $$ -o ucomm >/dev/null 2>&1 && PGT_COMM=ucomm
     [ ! "$PGT_STIME" ] && PGT_STIME=time
 }
 # busybox no -p option
-[ ! "$PGT_COMM" ] && ! ps -p $$ >/dev/null 2>&1 && PGT_COMM=comm && PGT_STIME=time
+[ ! "$PGT_COMM" ] && ! ps -p $$ >/dev/null 2>&1 && PGT_COMM=comm && PGT_STIME=etime
 
 SYSTEM=$(uname -s 2>/dev/null || echo "Linux")
 PS_OPTION=(ax)
@@ -102,25 +102,21 @@ function treedisplay(use_ascii, use_color) {
     if (use_color) {
         COLOR_FG = "\x1b[38;5;"
         COLOR_RESET = "\x1b[0m"
-        colors["pid"] = "12m"
-        colors["user"] = "11m"
-        colors["uid"] = "11m"
-        colors["comm"] = "10m"
-        colors["ucomm"] = "10m"
-        colors["fname"] = "10m"
-        colors["stime"] = "14m"
-        colors["start"] = "14m"
-        colors["args"] = "15m"
-        colors["%cpu"] = "9m"
-        colors["default"] = "13m"
+        col[fpid] = "12m"
+        col[fuser] = "11m"
+        col[fcomm] = "10m"
+        col[fstime] = "14m"
+        col["args"] = "15m"
+        col["%cpu"] = "9m"
+        col["default"] = "13m"
     }
 }
 
 function colorize(field, value) {
     # colorize fields
-    if (field in colors)
-        return COLOR_FG colors[field] value COLOR_RESET
-    return COLOR_FG colors["default"] value
+    if (field in col)
+        return COLOR_FG col[field] value COLOR_RESET
+    return COLOR_FG col["default"] value
 }
 
 function proctree(pids, use_ascii, use_color) {
