@@ -102,7 +102,7 @@ function treedisplay(use_ascii, use_color) {
     if (use_color) {
         COLOR_FG = "\x1b[38;5;"
         COLOR_RESET = "\x1b[0m"
-        col[fpid] = "12m"
+        col["pid"] = "12m"
         col[fuser] = "11m"
         col[fcomm] = "10m"
         col[fstime] = "14m"
