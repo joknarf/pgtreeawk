@@ -79,6 +79,30 @@ install using git:
 ```
 # git clone https://github.com/joknarf/pgtreeawk
 ```
+or use your prefered method according to your OS:
+
+```
+brew install joknarf/tools/pgtree
+```
+
+```
+sudo dnf install https://github.com/joknarf/pgtreeawk/releases/latest/download/pgtree.rpm
+```
+
+```
+curl -OL https://github.com/joknarf/pgtreeawk/releases/latest/download/pgtree.deb
+sudo dpkg -i pgtree.deb
+```
+
+```
+curl -OL https://github.com/joknarf/pgtreeawk/releases/latest/download/pgtree.apk
+sudo apk add --allow-untrusted pgtree.apk
+```
+
+```
+curl -OL https://github.com/joknarf/pgtreeawk/releases/latest/download/pgtree.pkg
+sudo installer -pkg pgtree.pkg -target /
+```
 
 ## Usage
 ```
