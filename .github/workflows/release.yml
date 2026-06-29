@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -48,7 +48,7 @@ jobs:
           ln -s ${TOOL}_${VERSION}_all.deb $TOOL.deb
 
       - name: Checkout deb
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: joknarf/deb
           token: ${{ secrets.JOKNARF_YUM_TOKEN }}
@@ -70,7 +70,7 @@ jobs:
           ln -s $TOOL-$VERSION-1.noarch.rpm $TOOL.rpm
 
       - name: Checkout yum
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: joknarf/yum
           token: ${{ secrets.JOKNARF_YUM_TOKEN }}
@@ -113,7 +113,7 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Checkout Homebrew tap
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: joknarf/homebrew-tools
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -151,7 +151,7 @@ jobs:
       image: alpine:latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -174,7 +174,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
