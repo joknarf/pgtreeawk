@@ -406,6 +406,7 @@ case "$wrap" in
     n|no) dowrap=false ;;
     *) [ -t 1 ] && dowrap=true || dowrap=false ;;
 esac
+[ "${@:$#-1:1}" = -- ] && pgrep_args+=(--)
 shift $((OPTIND - 1)); unset OPTIND
 pgrep_args+=("$@")
 $dowrap && printf "\x1b[?7l" && trap 'printf "\x1b[?7h"' EXIT # rmam/smam
