@@ -15,6 +15,56 @@
 # __copyright__ = "Copyright 2020, Franck Jouvanceau"
 # __license__ = "MIT"
 
+[ "$BASH_SOURCE" != "$0" ] && {
+# Bash completion
+_pgt_reply() {
+  local IFS=$'\n'
+  set -f
+  [ "$COMPLETE_NG_CASEI" ] && COMPREPLY=( $(cat $1) ) || COMPREPLY=( $(sed -e 's/\t.*//' $1) )
+  set +f
+}
+_pgtree()
+{
+   local word="${COMP_WORDS[COMP_CWORD]}" pgopt='-l' i pg p n=$'\n' IFS="$IFS"
+   [[ $word =  -* ]] && {
+     _pgt_reply <(pgtree -h |awk -F ' : ' '$1 ~ /^ *-/{sub("^ *","");opt=$1;sub(" .*","",opt);print opt"\t"substr($0,length($1)+4)}')
+     return 0
+   }
+   for ((i=1;i<COMP_CWORD;i++));do
+     case "${COMP_WORDS[i]}" in
+       -[uUtgG]) ((i<COMP_CWORD-1)) && pgopt+=" ${COMP_WORDS[i]} ${COMP_WORDS[i+1]}";;
+       -f) pgopt+=" -af";;
+       --) break;
+     esac
+   done
+   case "${COMP_WORDS[COMP_CWORD-1]}" in
+     -u) _pgt_reply <(ps ax -o user=);return 0;;
+     -[Cw]) COMPREPLY=(yes no);return 0;;
+     -t) compopt -o nospace
+         _pgt_reply <(who |awk '{ printf("%s\t%-10s %s %s %s\n", $2,$1,$3,$4,$5) }')
+         return 0
+     ;;
+     -[pP]) _pgt_reply <(pgrep -af $pgopt . |awk '{print $1"\t"substr($0,length($1)+2)}')
+       return 0
+     ;;
+     -O)
+        local pso=(stime lstart %cpu %mem rss vsz tty exe stat state uid sid time wchan)
+        [[ "$word" = *,* ]] && p="${word%,*},"
+        pso=("${pso[@]/#/$p}")
+        COMPREPLY=( $(compgen -W "${pso[*]}" -- $word) )
+        return 0
+     ;;
+   esac
+   : ${word:=.}
+   compopt -o filenames
+   pg="$(pgrep $pgopt "$word")"
+   _pgt_reply <(awk '{print substr($0,length($1)+2)}' <<<"$pg"|sed 's/[][\.*^$(){}?+|]/\\&/g')
+   return 0
+}
+complete -F _pgtree pgtree pgt
+return
+}
+
 usage() {
     cat - <<'EOF'
     usage: pgtree [-W] [-RIya] [-C <when>] [-O <psfield>] [-c|-k|-K] [-1|-p <pid1>,...|<pgrep args>]
