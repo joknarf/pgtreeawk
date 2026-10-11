@@ -59,6 +59,7 @@ _pgtree()
    case "${COMP_WORDS[COMP_CWORD-1]}" in
      -u) _pgt_reply <(ps "${PGT_PSOPT[@]}" -o user=);return 0;;
      -[Cw]) COMPREPLY=(yes no);return 0;;
+     -r) COMPREPLY=(D R S Z);return 0;;
      -t) compopt -o nospace
          _pgt_reply <(who |awk '{ printf("%s\t%-10s %s %s %s\n", $2,$1,$3,$4,$5) }')
          return 0
@@ -427,7 +428,7 @@ _pgrep() {
     ' re="$re" IGNORECASE="$icase"
 }
 
-argopt="WRThIckKfxvirnoyaA1C:p:u:U:g:G:P:s:t:F:O:w:"
+argopt="WRThIckKfxvinoyaA1Cr::p:u:U:g:G:P:s:t:F:O:w:"
 args="${*}"
 pids=(0)
 PGT_PID='pid'
