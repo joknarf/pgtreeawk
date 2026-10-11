@@ -51,7 +51,7 @@ _pgtree()
    }
    for ((i=1;i<COMP_CWORD;i++));do
      case "${COMP_WORDS[i]}" in
-       -[uUtgG]) ((i<COMP_CWORD-1)) && pgopt+=" ${COMP_WORDS[i]} ${COMP_WORDS[i+1]}";;
+       -[uUtgGr]) ((i<COMP_CWORD-1)) && pgopt+=" ${COMP_WORDS[i]} ${COMP_WORDS[i+1]}";;
        -f) pgopt+=" $PGT_PGA -f";;
        --) break;
      esac
