@@ -14,13 +14,32 @@
 # __author__ = "Franck Jouvanceau"
 # __copyright__ = "Copyright 2020, Franck Jouvanceau"
 # __license__ = "MIT"
+_pgt_initsys() {
+    local system
+    system=$(uname -s 2>/dev/null || echo "Linux")
+    PGT_PSOPT=(ax)
+    PGT_PGOPT=''
+    PGT_PGA='-a'
+    pgrep -a -P $$ >/dev/null 2>&1
+    (($?==2)) && PGT_PGA=''
+    case "$system" in
+        AIX)     PGT_PSOPT=(-e); PGT_STIME="start";;
+        Darwin)  PGT_STIME="start";PGT_PGOPT='-a';;
+        SunOS)   PGT_PSOPT=(-e); PGT_COMM="fname";;
+        CYGWIN*) PGT_PSOPT=(-e);;
+    esac
+}
 
 [ "$BASH_SOURCE" != "$0" ] && {
+type pgrep >/dev/null 2>&1 || return 0
+_pgt_initsys
+unset -f _pgt_initsys
+unset PGT_PGOPT PGT_COMM PGT_STIME
 # Bash completion
 _pgt_reply() {
   local IFS=$'\n'
   set -f
-  [ "$COMPLETE_NG_CASEI" ] && COMPREPLY=( $(cat $1) ) || COMPREPLY=( $(sed -e 's/\t.*//' $1) )
+  [ "$COMPLETE_NG_CASEI" ] && COMPREPLY=( $(sed -e 's/ *$//' $1) ) || COMPREPLY=( $(sed -e 's/\t.*//' -e 's/ *$//' $1) )
   set +f
 }
 _pgtree()
@@ -33,22 +52,23 @@ _pgtree()
    for ((i=1;i<COMP_CWORD;i++));do
      case "${COMP_WORDS[i]}" in
        -[uUtgG]) ((i<COMP_CWORD-1)) && pgopt+=" ${COMP_WORDS[i]} ${COMP_WORDS[i+1]}";;
-       -f) pgopt+=" -af";;
+       -f) pgopt+=" $PGT_PGA -f";;
        --) break;
      esac
    done
    case "${COMP_WORDS[COMP_CWORD-1]}" in
-     -u) _pgt_reply <(ps ax -o user=);return 0;;
+     -u) _pgt_reply <(ps "${PGT_PSOPT[@]}" -o user=);return 0;;
      -[Cw]) COMPREPLY=(yes no);return 0;;
      -t) compopt -o nospace
          _pgt_reply <(who |awk '{ printf("%s\t%-10s %s %s %s\n", $2,$1,$3,$4,$5) }')
          return 0
      ;;
-     -[pP]) _pgt_reply <(pgrep -af $pgopt . |awk '{print $1"\t"substr($0,length($1)+2)}')
-       return 0
+     -[pP]) pg="$(pgrep $PGT_PGA -f $pgopt .)"
+         _pgt_reply <(awk '{sub("^ *","");print $1"\t"substr($0,length($1)+2)}' <<<"$pg")
+         return 0
      ;;
      -O)
-        local pso=(stime lstart %cpu %mem rss vsz tty exe stat state uid sid time wchan)
+        local pso=(stime lstart pcpu pmem rss vsz tty exe stat s uid sid time wchan)
         [[ "$word" = *,* ]] && p="${word%,*},"
         pso=("${pso[@]/#/$p}")
         COMPREPLY=( $(compgen -W "${pso[*]}" -- $word) )
@@ -58,7 +78,7 @@ _pgtree()
    : ${word:=.}
    compopt -o filenames
    pg="$(pgrep $pgopt "$word")"
-   _pgt_reply <(awk '{print substr($0,length($1)+2)}' <<<"$pg"|sed 's/[][\.*^$(){}?+|]/\\&/g')
+   _pgt_reply <(awk '{sub("^ *","");print substr($0,length($1)+2)}' <<<"$pg"|sed 's/[][\.*^$(){}?+|]/\\&/g')
    return 0
 }
 complete -F _pgtree pgtree pgt
@@ -106,16 +126,7 @@ ps -p $$ -o ucomm >/dev/null 2>&1 && PGT_COMM=ucomm
 }
 # busybox no -p option
 [ ! "$PGT_COMM" ] && ! ps -p $$ >/dev/null 2>&1 && PGT_COMM=comm && PGT_STIME=etime
-
-SYSTEM=$(uname -s 2>/dev/null || echo "Linux")
-PS_OPTION=(ax)
-PGR_OPT=''
-case "$SYSTEM" in
-    AIX)    PS_OPTION=(-e); PGT_STIME="start" ;;
-    Darwin) PGT_STIME="start";PGR_OPT='-a' ;;
-    SunOS)  PS_OPTION=(-e); PGT_COMM="fname" ;;
-    CYGWIN*)PS_OPTION=(-e);;
-esac
+_pgt_initsys
 
 [ -x /bin/nawk ] && awk=nawk || awk=awk
 pgtreeawk=$(cat <<'EOF'
@@ -384,7 +395,7 @@ EOF
 )
 
 pgt() {
-    $awk -v mypid=$$ -v psopt="${PS_OPTION[*]}" -v fpid="$PGT_PID" -v fstime="$PGT_STIME" -v fcomm="$PGT_COMM" \
+    $awk -v mypid=$$ -v psopt="${PGT_PSOPT[*]}" -v fpid="$PGT_PID" -v fstime="$PGT_STIME" -v fcomm="$PGT_COMM" \
         -v fuser="$PGT_USER" -v spids="${pids[*]}" -v sig="$sig" -v xfields="$xfields" -v soptions="${options[*]}" \
         "$pgtreeawk" -- "$@"
 }
@@ -396,7 +407,7 @@ _pgrep() {
     while getopts "$opts" opt; do
         case $opt in
             f) psfield='args' ;;
-            u) PS_OPTION=(-u "$OPTARG") ;;
+            u) PGT_PSOPT=(-u "$OPTARG") ;;
             i) icase=1 ;;
             x) exact=true ;;
         esac
@@ -407,8 +418,8 @@ _pgrep() {
     $exact && re="^$1$" || re="$1"
     printf -v w "%*s" 20 ''
     w=${w// /-}
-    PS_OPTION+=(-o "$PGT_PID=$w" -o "$psfield")
-    ps "${PS_OPTION[@]}" | $awk '
+    PGT_PSOPT+=(-o "$PGT_PID=$w" -o "$psfield")
+    ps "${PGT_PSOPT[@]}" | $awk '
       NR==1 { next }
       { pid=substr($0,1,20); gsub(" ","",pid) }
       { info=substr($0,22); sub(" *$","",info) }
@@ -435,7 +446,7 @@ while getopts "$argopt" opt; do
         [cya]) options+=("-$opt") ;;
         W) watch=true ;;
         w) wrap="$OPTARG" ;;
-        T) [ "$PGT_STIME" = "etime" ] && PGT_PGREP='_pgrep' || PGT_PID='spid'; PS_OPTION+=(-T) ;;
+        T) [ "$PGT_STIME" = "etime" ] && PGT_PGREP='_pgrep' || PGT_PID='spid'; PGT_PSOPT+=(-T) ;;
         k) sig=15 ;;
         K) sig=9 ;;
         p) pids=("$OPTARG");popt=1 ;;
@@ -467,10 +478,10 @@ while :;do
         if [ "$popt" ];then
             pids=( $(ps -T -p "${pids[@]}" -o spid=) )
         else
-            [ "$pgrep_args" ] && pids=( $("$PGT_PGREP" $PGR_OPT -w "${pgrep_args[@]}") )
+            [ "$pgrep_args" ] && pids=( $("$PGT_PGREP" $PGT_PGOPT -w "${pgrep_args[@]}") )
        fi
     else
-        [ "$pgrep_args" ] && pids=( $("$PGT_PGREP" $PGR_OPT "${pgrep_args[@]}") )
+        [ "$pgrep_args" ] && pids=( $("$PGT_PGREP" $PGT_PGOPT "${pgrep_args[@]}") )
     fi
     pgt
     $watch || break
