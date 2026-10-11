@@ -39,7 +39,7 @@ unset PGT_PGOPT PGT_COMM PGT_STIME
 _pgt_reply() {
   local IFS=$'\n'
   set -f
-  [ "$COMPLETE_NG_CASEI" ] && COMPREPLY=( $(sed -e 's/ *$//' $1) ) || COMPREPLY=( $(sed -e 's/\t.*//' -e 's/ *$//' $1) )
+  [ "$COMPLETE_NG_CASEI" ] && COMPREPLY=( $(sed -e 's/ *$//' -e 's/^ *//' $1) ) || COMPREPLY=( $(sed -e 's/\t.*//' -e 's/ *$//' -e 's/^ *//' $1) )
   set +f
 }
 _pgtree()
