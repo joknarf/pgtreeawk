@@ -52,6 +52,7 @@ _pgtree()
    for ((i=1;i<COMP_CWORD;i++));do
      case "${COMP_WORDS[i]}" in
        -[uUtgGr]) ((i<COMP_CWORD-1)) && pgopt+=" ${COMP_WORDS[i]} ${COMP_WORDS[i+1]}";;
+       -T) pgopt+=" -w";;
        -f) pgopt+=" $PGT_PGA -f";;
        --) break;
      esac
@@ -110,6 +111,17 @@ usage() {
     -p <pids> : select processes pids to display hierarchy (default 0)
     -1 : display hierachy children of pid 1 (not including pid 0)
     <pgrep args> : use pgrep to select processes (see pgrep -h)
+    -u : euid user list
+    -U : ruid user list
+    -x : exact match
+    -f : full args match
+    -r : runstates list
+    -P : ppid
+    -s : sid
+    -t : tty
+    -i : ignore-case
+    -g : pgrp
+    -G : rgid
 
     found pids are prefixed with ►
 EOF
@@ -428,7 +440,7 @@ _pgrep() {
     ' re="$re" IGNORECASE="$icase"
 }
 
-argopt="WRThIckKfxvinoyaA1Cr::p:u:U:g:G:P:s:t:F:O:w:"
+argopt="WRThIckKfxvinoyaA1Cr::p:u:U:g:G:P:s:t:F:O:w:-:"
 args="${*}"
 pids=(0)
 PGT_PID='pid'
@@ -456,6 +468,7 @@ while getopts "$argopt" opt; do
         R) PGT_PGREP='_pgrep' ;;
         [Afxvino]) pgrep_args+=("-$opt") ;;
         [uUgGPrstF]) pgrep_args+=("-$opt" "$OPTARG") ;;
+        -) pgrep_args+=("--$OPTARG");;
         *) pgrep_args+=("$opt") ;;
     esac
 done
@@ -469,7 +482,7 @@ case "$wrap" in
     n|no) dowrap=false ;;
     *) [ -t 1 ] && dowrap=true || dowrap=false ;;
 esac
-(($#)) && [ "${@:$#-1:1}" = -- ] && pgrep_args+=(--)
+[ "${@:$OPTIND-1:1}" = -- ] && ((OPTIND--))
 shift $((OPTIND - 1)); unset OPTIND
 pgrep_args+=("$@")
 $dowrap && printf "\x1b[?7l" && trap 'printf "\x1b[?7h"' EXIT # rmam/smam
