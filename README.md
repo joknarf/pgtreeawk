@@ -23,6 +23,10 @@ Same features as [joknarf/pgtree](https://github.com/joknarf/pgtree) but most po
 * supports all unix/linux/macos
 * interactive TUI live filtering
 
+## Demo interactive mode
+<img width="1000" height="600" alt="pgtree2" src="https://github.com/user-attachments/assets/6eeb8209-6eec-4b3d-84e9-71ffd5c29f0c" />
+
+
 The purpose is to have the tool working out of the box on any Unix box.
 
 Should work on any Unix that can execute :
