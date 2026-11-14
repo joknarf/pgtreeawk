@@ -24,7 +24,8 @@ Same features as [joknarf/pgtree](https://github.com/joknarf/pgtree) but most po
 * interactive TUI live filtering
 
 ## Demo interactive mode
-<img alt="pgtree -M" src="https://github.com/user-attachments/assets/0ba84ce7-f758-4aa7-806f-89c651b9993a" />
+![pgtree_interactive](https://github.com/user-attachments/assets/0ba84ce7-f758-4aa7-806f-89c651b9993a)
+
 
 
 The purpose is to have the tool working out of the box on any Unix box.
