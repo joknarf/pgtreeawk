@@ -90,8 +90,9 @@ return
 
 usage() {
     cat - <<'EOF'
-    usage: pgtree [-W] [-RIya] [-C <when>] [-O <psfield>] [-c|-k|-K] [-1|-p <pid1>,...|<pgrep args>]
+    usage: pgtree [-W|-M] [-RIya] [-C <when>] [-O <psfield>] [-c|-k|-K] [-1|-p <pid1>,...|<pgrep args>]
 
+    -M : interactive Mode
     -I : use -o uid instead of -o user for ps command
          (if uid/user mapping is broken ps command can be stuck)
     -c : display processes and children only
@@ -129,14 +130,59 @@ EOF
     exit 1
 }
 
+del_item() {
+    local i a="$1" p="$2" del2="$3"
+    eval '
+        for ((i=0;i<${#'$a'[@]};i++));do
+            [ "${'$a'[i]}" = "$p" ] && {
+              unset '$a'[i]
+              ((del2)) && unset '$a'[i+1]
+              '$a'=("${'$a'[@]}")
+              return 0
+            }
+        done
+    '
+    return 1
+}
+toggle() {
+    local a="$1" p="$2"
+    del_item "$a" "$p" && return 1
+    eval "$a"'+=("$p")'
+    return 0
+}
+
 pgt_key() {
     case "$key" in
+        'OP'|'11~')
+            local t=$'\t'
+            _sel_tty_restore
+            selector -p "options" -q -f - <<EOF
+alt-u${t}-u effective user
+ctrl-u${t}-U real user
+alt-g${t}-g process group
+ctrl-g${t}-G real group
+alt-t${t}-T toggle threads view
+alt-c${t}-c toggle children only
+alt-x${t}-x toggle exact match
+alt-f${t}-f toggle full command match
+alt-i${t}-i toggle case sensitive
+alt-o${t}-O add ps fields
+alt-k${t}-k kill process tree
+ctrl-k${t}-K kill -9 process tree
+ctrl-l${t}refresh process tree
+EOF
+            _sel_tty_init
+            [ "$selected" ] || return 0
+            key="$selected"
+        ;;
+    esac
+    case "$key" in
         'OT'|'[15~') # F5
-            _sel_items_filter "${pgrep_re[@]}"
+            pgt_items_filter "${pgrep_re[@]}"
             return 0
         ;;
         ctrl-l)
-            _sel_items_filter "${pgrep_re[@]}"
+            pgt_items_filter "${pgrep_re[@]}"
             return 2
         ;;
         ctrl-k|alt-k)
@@ -144,7 +190,7 @@ pgt_key() {
             [[ $item =~ (m|─)([0-9]+) ]] && p="${BASH_REMATCH[2]}"
             ((p>1)) || return 0
             pids=("$p")
-            [ "$key" = alt-k ] && sig=9 || sig=15
+            [ "$key" = ctrl-k ] && sig=9 || sig=15
             popt=1
             _sel_tty_restore
             stty sane
@@ -155,50 +201,69 @@ pgt_key() {
             pgt_items_filter "${pgrep_re[@]}"
             return 0
         ;;
-        ctrl-u)
-            local u
+        ctrl-[ug]|alt-[ug])
+            local p="-${key#*-}" pr='user'
+            [[ $key = ctrl-* ]] && p=${p^^}
+            [ "$p" = -g ] && pr='pgid'
+            [ "$p" = -G ] && pr='group'
             _sel_tty_restore
-            selector -p user -q -f <(compgen -W "$(ps "${PGT_PSOPT[@]}" -o user=)"| sort -u)
+            selector -p "$p $pr" -q -f <(compgen -W "$(ps "${PGT_PSOPT[@]}" -o "$pr=")"| sort -u)
             _sel_tty_init
-            for ((i=0;i<${#pgrep_args[@]};i++));do
-                [ "${pgrep_args[i]}" = -u ] && unset pgrep_args[i] pgrep_args[i+1]
-            done
-            [ "$selected" ] && pgrep_args+=(-u "$selected")
+            del_item pgrep_args "$p" 1
+            [[ ${pgrep_args[*]} =~ -[uUgGPrstF] ]] || pgrep_crit=0
+            [ "$selected" ] && pgrep_args+=($p "$selected") && pgrep_crit=1
             pgt_items_filter "${pgrep_re[@]}"
             return 0
         ;;
-        alt-i)
-            local c=0
-            for ((i=0;i<${#pgrep_args[@]};i++));do
-                [ "${pgrep_args[i]}" = -i ] && unset pgrep_args[i] && c=1
-            done
-            ((c)) || pgrep_args+=(-i)
+        alt-[ixf])
+            local p="-${key#*-}"
+            [ "$p" = -x ] && del_item pgrep_args -f
+            [ "$p" = -f ] && del_item pgrep_args -x
+            toggle pgrep_args "$p"
             pgt_items_filter "${pgrep_re[@]}"
+            [ "$p" = -i ] || return 0
         ;;
-        ctrl-o)
+        alt-[ct])
+            local p="-${key#*-}"
+            [ "$p" = -t ] && { p='-T'; toggle PGT_PSOPT -T && PGT_PID='spid'|| PGT_PID='pid'; }
+            toggle options "$p"
+            pgt_items_filter "${pgrep_re[@]}"
+            return 0
+        ;;
+        ctrl-o|alt-o)
             local pso='stime lstart pcpu pmem rss vsz tty exe stat s uid sid time wchan'
             _sel_tty_restore
-            selector -p "ps -o $xfields" -q -f <(compgen -W "$pso")
+            selector -p "-O $xfields" -q -f <(compgen -W "$pso")
             _sel_tty_init
             [ "$selected" ] && xfields+=",$selected"
             pgt_items_filter "${pgrep_re[@]}"
+            return 0
+        ;;
+        ctrl-[jm]|$'\0d')
+            local p
+            [[ $item =~ (m|─)([0-9]+) ]] && p="${BASH_REMATCH[2]}"
+            ((p>1)) || return 0
+            pids=("$p")
+            popt=1
+            pgt_items_filter ''
             return 0
         ;;
     esac
     return 2
 }
 
-pgt_do() {
+pgt_pids() {
     pgrep_re=("$@")
     if [ "$PGT_PID" = 'spid' ] ;then
         if ((popt));then
             pids=( $(ps -T -p "${pids[@]}" -o spid=) )
         else
-            [ "$pgrep_args$pgrep_re" ] && pids=( $("$PGT_PGREP" $PGT_PGOPT -w "${pgrep_args[@]}" -- "${pgrep_re[@]}") )
+            [ ! "$pgrep_re" ] && ((pgrep_crit==0)) && return
+            pids=( $("$PGT_PGREP" $PGT_PGOPT -w "${pgrep_args[@]}" -- "${pgrep_re[@]}") )
        fi
     else
-        [ ! "$pgrep_re" ] && [ "${pgrep_args[*]}" = -f ] && return
-        [ "$pgrep_args$pgrep_re" ] && pids=( $("$PGT_PGREP" $PGT_PGOPT "${pgrep_args[@]}" -- "${pgrep_re[@]}") )
+        [ ! "$pgrep_re" ] && ((pgrep_crit==0)) && return
+        pids=( $("$PGT_PGREP" $PGT_PGOPT "${pgrep_args[@]}" -- "${pgrep_re[@]}") )
     fi
 }
 
@@ -256,7 +321,7 @@ function treedisplay(use_ascii, use_color) {
         col[fcomm] = "10m"
         col[fstime] = "14m"
         col["args"] = "15m"
-        col["%cpu"] = "9m"
+        col["%cpu"] = col["pcpu"] = "9m"
         col["default"] = "13m"
     }
 }
@@ -513,20 +578,22 @@ _pgrep() {
       info ~ re { print pid }
     ' re="$re" IGNORECASE="$icase"
 }
+
 pgt_menu() {
     local sel="${0%/*}/../share/pgtree/selector"
     [ -f "$sel" ] || sel="${0%/*}/selector"
     . "$sel"
     pgt_items_filter() {
         [ "$1" ] || shift
-        pids=($def_pids)
-        pgt_do "$@"
-        prompt="pgtree ${pgrep_args[*]}"
+        ((popt)) || pids=($def_pids)
+        pgt_pids "$@"
+        printf -v prompt '%s ' "${options[@]}" "${pgrep_args[@]}"
+        prompt="pgtree ${prompt% }"
         _sel_load_items < <(pgt)
         filter="$pgrep_re"
         ((${#_aitems[@]})) && _items_ori=("${_aitems[@]}")
     }
-    selector -q -l pgt_items_filter -p "pgtree ${pgrep_args[*]}" -k pgt_key -H '[C-u]:user [C-k]:kill [A-k]:kill -9 [A-i]:case [C-o]:ps fields [C-l]:refresh' -f <(pgt)
+    selector -q -l pgt_items_filter -F "$pgrep_re" -p "pgtree ${pgrep_args[*]}" -k pgt_key -H '[F1] shortcuts' -f <(pgt)
     exit 0
 }
 
@@ -546,7 +613,8 @@ popt=0
 def_pids=0
 xfields="$PGT_STIME"
 set -- $PGTREE "$@"
-argopt="MWRThIckKfxvinoyaA1C:r:p:u:U:g:G:P:s:t:F:O:w:-:"
+argopt="MWRThIckKfxvinoyaA1C:r:p:u:U:g:G:P:s:t:F:O:w:"
+pgrep_crit=0
 while getopts "$argopt" opt; do
     case $opt in
         h) usage;;
@@ -559,13 +627,12 @@ while getopts "$argopt" opt; do
         T) [ "$PGT_STIME" = "etime" ] && PGT_PGREP='_pgrep' || PGT_PID='spid'; PGT_PSOPT+=(-T) ;;
         k) sig=15 ;;
         K) sig=9 ;;
-        p) pids=("$OPTARG");popt=1 ;;
+        p) pids=(${OPTARG//,/ });popt=1 ;;
         O) xfields="$OPTARG" ;;
         1) pids=(1);def_pids=1 ;;
         R) PGT_PGREP='_pgrep' ;;
         [Afxvino]) pgrep_args+=("-$opt") ;;
-        [uUgGPrstF]) pgrep_args+=("-$opt" "$OPTARG") ;;
-        -) pgrep_args+=("--$OPTARG");;
+        [uUgGPrstF]) pgrep_args+=("-$opt" "$OPTARG");pgrep_crit=1 ;;
         *) pgrep_args+=("$opt") ;;
     esac
 done
@@ -579,13 +646,12 @@ case "$wrap" in
     n|no) dowrap=false ;;
     *) [ -t 1 ] && dowrap=true || dowrap=false ;;
 esac
-[ "${@:$OPTIND-1:1}" = -- ] && ((OPTIND--))
 shift $((OPTIND - 1)); unset OPTIND
 pgrep_re=("$@")
 $dowrap && printf "\x1b[?7l" && trap 'printf "\x1b[?7h"' EXIT # rmam/smam
 while :;do
     $watch && clear && echo "Every 2.0s: pgtree $args    $(date)"
-    pgt_do "${pgrep_re[@]}"
+    pgt_pids "${pgrep_re[@]}"
     ((menu)) && pgt_menu
     pgt
     $watch || break

@@ -88,18 +88,25 @@ _sel_probe_smam() {
   [ "$col" = "$COLUMNS" ] && SEL_SMAM=1
 }
 
+_sel_maxlines() {
+  IFS=' ' read -r LINES COLUMNS < <($_sel_stty size </dev/tty)
+  _maxlines="${maxlines:-$LINES}"
+  [ "$help" ] && ((_maxlines--))
+  ((_maxlines > 2)) || _maxlines=''
+}
+
 _sel_tty_init() {
   ((tty_init)) && return
-  [ "$BASH" ] && { trap_winch="$(trap -p WINCH)";trap - WINCH; }
+  [ "$BASH" ] && {
+    trap_winch="$(trap -p WINCH)"
+    trap '_sel_maxlines;_sel_showmenu' WINCH
+  }
   _stty_ori="$($_sel_stty -g </dev/tty 2>/dev/null)"
   : $("$_sel_stty" intr '' -echo </dev/tty 2>/dev/null)
-  [ "$LINES" ] || read -r LINES COLUMNS < <($_sel_stty size </dev/tty)
+  _sel_maxlines
   _sel_tput civis
   [ "$SEL_SMAM" ] || _sel_probe_smam
   printf "\e[?7l" # nowrap
-  : "${_maxlines:=$LINES}"
-  [ "$help" ] && ((_maxlines--))
-  ((_maxlines > 2)) || _maxlines=''
   _sel_init_filter
   disp_item_sel="\n$bg${SELECTOR_COL_ARROW}m$wfg %*s $fg${SELECTOR_COL_ARROW}m\e[49m$pl$fg${SELECTOR_COL_SELECTED}m%s%-*s$fg${SELECTOR_COL_COMSEL}m %s\e[0m"
   disp_item="\n$fg${SELECTOR_COL_NUM}m %*s  $fg${SELECTOR_COL_ITEM}m%s%-*s$fg${SELECTOR_COL_COMMENT}m %s\e[0m"
@@ -111,7 +118,7 @@ _sel_tty_init() {
 
 _sel_tty_restore() {
   ((tty_init)) || return
-  [ "$trap_winch" ] && eval "$trap_winch"
+  [ "$BASH" ] && { [ "$trap_winch" ] && eval "$trap_winch" || trap - WINCH; }
   _sel_tput ed >&2
   _sel_tput cnorm >&2
   : $("$_sel_stty" "$_stty_ori" </dev/tty >/dev/null 2>&1)
@@ -544,10 +551,11 @@ _sel_domenu()
         }
         _sel_menuprompt;;
       ctrl-l) # Ctl-L => refresh
-        read -r LINES COLUMNS < <($_sel_stty size </dev/tty)
+        _sel_maxlines
         _sel_showmenu;;
       ctrl-a) # Ctl-A => all
-        _maxlines=''
+        maxlines=''
+        _sel_maxlines
         _sel_showmenu;;
       alt-i)
         ((SELECTOR_CASEI)) && {
@@ -557,7 +565,7 @@ _sel_domenu()
           disp_form="${disp_form//$SELECTOR_COL_TEXT/$SELECTOR_COL_CASEI}"
           SELECTOR_CASEI=1
         }
-        filter='';_sel_showmenu
+        _sel_showmenu
         ;;
       *) break;
     esac
@@ -570,7 +578,7 @@ function selector
   typeset prompt filter
   typeset bg="\e[48;2;" fg="\e[38;2;" pl=""
   typeset wfg="$fg${SELECTOR_COL_TEXT}m"
-  typeset _items _aitems _maxlines _autofilter _keyfunc _filfunc _sel_option _nsel=1 _items_ori disp_item_sel disp_item disp_form disp_help key nbitems _find_type _path_fprefix _path_rprefix _last_nsel _last_items _last_items_ori e archive quiet=0 shift stream _a filtered prev_filtered depth=1 tty_init=0 _stty_ori i j s lines cur item ritem itemfile uitem ufilt break=0 _powerline icons __ help
+  typeset _items _aitems maxlines _maxlines _autofilter _keyfunc _filfunc _sel_option _nsel=1 _items_ori disp_item_sel disp_item disp_form disp_help key nbitems _find_type _path_fprefix _path_rprefix _last_nsel _last_items _last_items_ori e archive quiet=0 shift stream _a filtered prev_filtered depth=1 tty_init=0 _stty_ori i j s lines cur item ritem itemfile uitem ufilt break=0 _powerline icons __ help
   [ "$ZSH_VERSION" ] || _a='_'
   ((SELECTOR_CASEI)) || SELECTOR_CASEI=0
   prompt='select'
@@ -593,7 +601,7 @@ function selector
         [ "$2" ] && itemfile="$2" || return 1;
         ;;
       -m|--max)
-        [[ $2 =~ ^[1-9][0-9]*$ ]] || return 1; ((_maxlines=$2+1))
+        [[ $2 =~ ^[1-9][0-9]*$ ]] || return 1; ((maxlines=$2+1))
         ;;
       -P|--powerline)
         [ "$2" ] && _powerline="$2" || return 1
