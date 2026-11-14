@@ -80,7 +80,7 @@ _sel_tput() {
 
 _sel_probe_smam() {
   typeset row col
-  SEL_SMAM=0
+  : ${SEL_SMAM:=0}
   printf '\e7\e[?7l\e[%dG  \e[6n' "$COLUMNS" >/dev/tty
   IFS= read -r"$_sel_rdn" 2 -t 1 </dev/tty || return
   IFS='[;' read -r -t 1 -d R row col </dev/tty
