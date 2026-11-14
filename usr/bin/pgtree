@@ -153,7 +153,7 @@ toggle() {
 
 pgt_key() {
     case "$key" in
-        'OP'|'11~')
+        'OP'|'11~'|alt-h) # F1 
             local t=$'\t'
             _sel_tty_restore
             selector -p "options" -q -f - <<EOF
