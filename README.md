@@ -21,6 +21,7 @@ Same features as [joknarf/pgtree](https://github.com/joknarf/pgtree) but most po
 * can send kill or kill -9 to processes and their children
 * watch process tree 
 * supports all unix/linux/macos
+* interactive TUI live filtering
 
 The purpose is to have the tool working out of the box on any Unix box.
 
@@ -107,8 +108,9 @@ sudo installer -pkg pgtree.pkg -target /
 ## Usage
 ```
 # pgtree -h
-    usage: pgtree [-W] [-RIya] [-C <when>] [-O <psfield>] [-c|-k|-K] [-1|-p <pid1>,...|<pgrep args>]
+    usage: pgtree [-W|-M] [-RIya] [-C <when>] [-O <psfield>] [-c|-k|-K] [-1|-p <pid1>,...|<pgrep args>]
 
+    -M : interactive mode
     -I : use -o uid instead of -o user for ps command
          (if uid/user mapping is broken ps command can be stuck)
     -c : display processes and children only 
