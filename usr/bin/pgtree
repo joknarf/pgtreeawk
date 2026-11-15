@@ -250,13 +250,16 @@ EOF
             return 0
         ;;
         alt-w)
-            local t
+            local i t
             while :;do
                 help="[Watch mode] $(date)"
                 pgt_items_filter "${pgrep_re[@]}"
                 _sel_showmenu
-                sleep 2
-                IFS= read -rsn 1 -t $_sel_tmout t && break
+                for i in . . . .;do 
+                    sleep 0.45
+                    IFS= read -rsn 1 -t $_sel_tmout t && break
+                done
+                [ "$t" ] && break
             done
             help='[F1] shortcuts'
             return 0
