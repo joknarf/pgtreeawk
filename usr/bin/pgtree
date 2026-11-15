@@ -169,6 +169,7 @@ alt-i${t}-i toggle case sensitive
 alt-o${t}-O add ps fields
 alt-k${t}-k kill process tree
 ctrl-k${t}-K kill -9 process tree
+alt-w${t}-W watch mode
 ctrl-l${t}refresh process tree
 EOF
             _sel_tty_init
@@ -246,6 +247,18 @@ EOF
             pids=("$p")
             popt=1
             pgt_items_filter ''
+            return 0
+        ;;
+        alt-w)
+            local t
+            while :;do
+                help="[Watch mode] $(date)"
+                pgt_items_filter "${pgrep_re[@]}"
+                _sel_showmenu
+                sleep 2
+                IFS= read -rsn 1 -t $_sel_tmout t && break
+            done
+            help='[F1] shortcuts'
             return 0
         ;;
     esac
