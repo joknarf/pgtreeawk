@@ -249,6 +249,9 @@ EOF
             pgt_items_filter ''
             return 0
         ;;
+        $'\x7f'|'ctrl-h') # backspace
+            [ ! "$filter" ] && popt=0
+        ;;
         alt-w)
             local i t
             while :;do
