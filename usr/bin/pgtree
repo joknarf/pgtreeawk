@@ -150,7 +150,19 @@ toggle() {
     eval "$a"'+=("$p")'
     return 0
 }
-
+utrim() {
+    sort -u"$1" |sed -e 's/^ *//' -e 's/ *$//'
+}
+pgt_psmenu() {
+  local p="$1" pr="$2"
+  _sel_tty_restore
+  selector -p "$p $pr" -q -f "$3" 
+  _sel_tty_init
+  del_item pgrep_args "$p" 1
+  [[ ${pgrep_args[*]} =~ -[uUgGPrstF] ]] || pgrep_crit=0
+  [ "$selected" ] && pgrep_args+=($p "$selected") && pgrep_crit=1
+  pgt_items_filter "${pgrep_re[@]}"
+}
 pgt_key() {
     case "$key" in
         'OP'|'11~'|alt-h) # F1 
@@ -161,6 +173,7 @@ alt-u${t}-u effective user
 ctrl-u${t}-U real user
 alt-g${t}-g process group
 ctrl-g${t}-G real group
+ctrl-t${t}-t tty
 alt-t${t}-T toggle threads view
 alt-c${t}-c toggle children only
 alt-x${t}-x toggle exact match
@@ -202,20 +215,19 @@ EOF
             pgt_items_filter "${pgrep_re[@]}"
             return 0
         ;;
-        ctrl-[ug]|alt-[ug])
-            local p="-${key#*-}" pr='user'
-            [[ $key = ctrl-* ]] && p=${p^^}
-            [ "$p" = -g ] && pr='pgid'
-            [ "$p" = -G ] && pr='group'
-            _sel_tty_restore
-            selector -p "$p $pr" -q -f <(compgen -W "$(ps "${PGT_PSOPT[@]}" -o "$pr=")"| sort -u)
-            _sel_tty_init
-            del_item pgrep_args "$p" 1
-            [[ ${pgrep_args[*]} =~ -[uUgGPrstF] ]] || pgrep_crit=0
-            [ "$selected" ] && pgrep_args+=($p "$selected") && pgrep_crit=1
-            pgt_items_filter "${pgrep_re[@]}"
+        ctrl-u|alt-u)
+            local p="-u"
+            [[ $key = ctrl-* ]] && p=-U
+            if command -v getent &>/dev/null ;then
+              pgt_psmenu "$p" user <(getent passwd $(ps "${PGT_PSOPT[@]}" -o "user=" |utrim)| awk -F: '{printf("%s\t%8s %s\n",$1, $3, $5)}')
+            else
+              pgt_psmenu "$p" user <(ps "${PGT_PSOPT[@]}" -o "user=" |utrim)
+            fi
             return 0
         ;;
+        ctrl-t)pgt_psmenu -t tty <(ps "${PGT_PSOPT[@]}" -o tty=|grep -Fv '?'| utrim); return 0;;
+        ctrl-g)pgt_psmenu -G group <(ps "${PGT_PSOPT[@]}" -o group=| utrim); return 0;;
+        alt-g) pgt_psmenu -g pgid <(ps "${PGT_PSOPT[@]}" -o pgid=| utrim n); return 0;;
         alt-[ixf])
             local p="-${key#*-}"
             [ "$p" = -x ] && del_item pgrep_args -f
