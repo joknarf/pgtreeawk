@@ -1,2 +1,3 @@
 [ -t 1 ] || return 0
-PATH="$PATH:$(\cd "${.sh.file%/*}";pwd)"
+alias pgtree="$(\cd "${.sh.file%/*}";pwd)/pgtree"
+alias pgt='pgtree -M1f'
